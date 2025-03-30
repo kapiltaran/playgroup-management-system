@@ -6,7 +6,10 @@ import {
   DollarSignIcon,
   PackageIcon,
   BarChart3Icon,
-  SettingsIcon
+  SettingsIcon,
+  GraduationCapIcon,
+  ReceiptIcon,
+  ClipboardCheckIcon
 } from "lucide-react";
 
 interface SidebarProps {
@@ -26,6 +29,21 @@ export default function Sidebar({ setOpen }: SidebarProps) {
       href: "/students",
       label: "Students",
       icon: <UsersIcon className="text-xl mr-3" />
+    },
+    {
+      href: "/classes",
+      label: "Classes",
+      icon: <GraduationCapIcon className="text-xl mr-3" />
+    },
+    {
+      href: "/fee-management",
+      label: "Fee Management",
+      icon: <ClipboardCheckIcon className="text-xl mr-3" />
+    },
+    {
+      href: "/fee-payments",
+      label: "Payments",
+      icon: <ReceiptIcon className="text-xl mr-3" />
     },
     {
       href: "/expenses",

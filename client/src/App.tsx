@@ -9,6 +9,9 @@ import Students from "@/pages/students";
 import Expenses from "@/pages/expenses";
 import Inventory from "@/pages/inventory";
 import Reports from "@/pages/reports";
+import Classes from "@/pages/classes";
+import FeeManagement from "@/pages/fee-management";
+import FeePayments from "@/pages/fee-payments";
 
 function Router() {
   return (
@@ -17,6 +20,9 @@ function Router() {
         <Route path="/" component={Dashboard} />
         <Route path="/dashboard" component={Dashboard} />
         <Route path="/students" component={Students} />
+        <Route path="/classes" component={Classes} />
+        <Route path="/fee-management" component={FeeManagement} />
+        <Route path="/fee-payments" component={FeePayments} />
         <Route path="/expenses" component={Expenses} />
         <Route path="/inventory" component={Inventory} />
         <Route path="/reports" component={Reports} />
