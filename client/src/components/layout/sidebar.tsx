@@ -62,11 +62,7 @@ export default function Sidebar({ setOpen }: SidebarProps) {
       label: "Reports",
       icon: <BarChart3Icon className="text-xl mr-3" />
     },
-    {
-      href: "/user-management",
-      label: "User Management",
-      icon: <UserCogIcon className="text-xl mr-3" />
-    },
+
     {
       href: "/settings",
       label: "Settings",

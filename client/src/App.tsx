@@ -13,7 +13,6 @@ import Classes from "@/pages/classes";
 import FeeManagement from "@/pages/fee-management";
 import FeePayments from "@/pages/fee-payments";
 import Settings from "@/pages/settings";
-import UserManagement from "@/pages/user-management";
 
 function Router() {
   return (
@@ -29,7 +28,6 @@ function Router() {
         <Route path="/inventory" component={Inventory} />
         <Route path="/reports" component={Reports} />
         <Route path="/settings" component={Settings} />
-        <Route path="/user-management" component={UserManagement} />
         <Route component={NotFound} />
       </Switch>
     </AppLayout>

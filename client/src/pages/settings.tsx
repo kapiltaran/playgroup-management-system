@@ -13,6 +13,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import RoleManagement from "@/pages/role-management";
+import UserManagement from "@/pages/user-management";
 
 interface CurrencySettings {
   value: string;
@@ -211,6 +212,7 @@ export default function SettingsPage() {
       <Tabs defaultValue="general" className="w-full">
         <TabsList className="mb-4">
           <TabsTrigger value="general">General Settings</TabsTrigger>
+          <TabsTrigger value="users">User Management</TabsTrigger>
           <TabsTrigger value="roles">Role Management</TabsTrigger>
         </TabsList>
         
@@ -219,6 +221,10 @@ export default function SettingsPage() {
             <CurrencySettings />
             {/* Add more settings cards here as needed */}
           </div>
+        </TabsContent>
+        
+        <TabsContent value="users">
+          <UserManagement />
         </TabsContent>
         
         <TabsContent value="roles">
