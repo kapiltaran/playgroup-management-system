@@ -9,7 +9,8 @@ import {
   SettingsIcon,
   GraduationCapIcon,
   ReceiptIcon,
-  ClipboardCheckIcon
+  ClipboardCheckIcon,
+  ShieldIcon
 } from "lucide-react";
 
 interface SidebarProps {
@@ -64,6 +65,11 @@ export default function Sidebar({ setOpen }: SidebarProps) {
       href: "/settings",
       label: "Settings",
       icon: <SettingsIcon className="text-xl mr-3" />
+    },
+    {
+      href: "/role-management",
+      label: "Role Management",
+      icon: <ShieldIcon className="text-xl mr-3" />
     }
   ];
 

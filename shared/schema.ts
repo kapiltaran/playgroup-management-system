@@ -5,6 +5,19 @@ import { z } from "zod";
 // Role definition using enum
 export const roleEnum = pgEnum('role', ['parent', 'teacher', 'officeadmin', 'superadmin']);
 
+export const moduleEnum = pgEnum('module', [
+  'students', 
+  'classes', 
+  'fee_management', 
+  'fee_payments', 
+  'expenses', 
+  'inventory', 
+  'reports',
+  'settings',
+  'user_management',
+  'role_management'
+]);
+
 // Class schema
 export const classes = pgTable("classes", {
   id: serial("id").primaryKey(),
@@ -196,6 +209,25 @@ export const insertSettingsSchema = createInsertSchema(settings).omit({
   updatedAt: true,
 });
 
+// Role permissions schema
+export const rolePermissions = pgTable("role_permissions", {
+  id: serial("id").primaryKey(),
+  role: roleEnum("role").notNull(),
+  module: moduleEnum("module").notNull(),
+  canView: boolean("can_view").notNull().default(false),
+  canCreate: boolean("can_create").notNull().default(false),
+  canEdit: boolean("can_edit").notNull().default(false),
+  canDelete: boolean("can_delete").notNull().default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertRolePermissionSchema = createInsertSchema(rolePermissions).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 // Type definitions for TypeScript
 export type Student = typeof students.$inferSelect;
 export type InsertStudent = z.infer<typeof insertStudentSchema>;
@@ -219,3 +251,5 @@ export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type Setting = typeof settings.$inferSelect;
 export type InsertSetting = z.infer<typeof insertSettingsSchema>;
+export type RolePermission = typeof rolePermissions.$inferSelect;
+export type InsertRolePermission = z.infer<typeof insertRolePermissionSchema>;

@@ -20,7 +20,9 @@ import {
   type Setting,
   type InsertSetting,
   type User,
-  type InsertUser
+  type InsertUser,
+  type RolePermission,
+  type InsertRolePermission
 } from "@shared/schema";
 
 // Storage interface
@@ -109,6 +111,18 @@ export interface IStorage {
   updateUserPassword(id: number, passwordHash: string): Promise<boolean>;
   deleteUser(id: number): Promise<boolean>;
   updateLastLogin(id: number): Promise<boolean>;
+  
+  // Role Permission methods
+  getRolePermissions(role?: string): Promise<RolePermission[]>;
+  getRolePermission(id: number): Promise<RolePermission | undefined>;
+  getRoleModulePermission(role: string, module: string): Promise<RolePermission | undefined>;
+  createRolePermission(permission: InsertRolePermission): Promise<RolePermission>;
+  updateRolePermission(id: number, permission: Partial<InsertRolePermission>): Promise<RolePermission | undefined>;
+  deleteRolePermission(id: number): Promise<boolean>;
+  
+  // Check module permissions
+  checkPermission(role: string, module: string, permission: 'view' | 'create' | 'edit' | 'delete'): Promise<boolean>;
+  getModulePermissions(role: string): Promise<Record<string, {canView: boolean, canCreate: boolean, canEdit: boolean, canDelete: boolean}>>;
 }
 
 export class MemStorage implements IStorage {
@@ -123,6 +137,7 @@ export class MemStorage implements IStorage {
   private reminders: Map<number, Reminder>;
   private settings: Map<number, Setting>;
   private users: Map<number, User>;
+  private rolePermissions: Map<number, RolePermission>;
   
   private studentId: number;
   private expenseId: number;
@@ -136,6 +151,8 @@ export class MemStorage implements IStorage {
   private settingId: number;
   private userId: number;
 
+  private rolePermissionId: number;
+
   constructor() {
     this.students = new Map();
     this.expenses = new Map();
@@ -148,6 +165,7 @@ export class MemStorage implements IStorage {
     this.reminders = new Map();
     this.settings = new Map();
     this.users = new Map();
+    this.rolePermissions = new Map();
     
     this.studentId = 1;
     this.expenseId = 1;
@@ -160,6 +178,7 @@ export class MemStorage implements IStorage {
     this.reminderId = 1;
     this.settingId = 1;
     this.userId = 1;
+    this.rolePermissionId = 1;
     
     // Initialize with sample data asynchronously
     setTimeout(() => {
@@ -1200,6 +1219,157 @@ export class MemStorage implements IStorage {
     return true;
   }
 
+  // Role Permission methods
+  async getRolePermissions(role?: string): Promise<RolePermission[]> {
+    let permissions = Array.from(this.rolePermissions.values());
+    
+    if (role) {
+      permissions = permissions.filter(perm => perm.role === role);
+    }
+    
+    return permissions.sort((a, b) => b.id - a.id);
+  }
+
+  async getRolePermission(id: number): Promise<RolePermission | undefined> {
+    return this.rolePermissions.get(id);
+  }
+
+  async getRoleModulePermission(role: string, module: string): Promise<RolePermission | undefined> {
+    return Array.from(this.rolePermissions.values()).find(
+      perm => perm.role === role && perm.module === module
+    );
+  }
+
+  async createRolePermission(permission: InsertRolePermission): Promise<RolePermission> {
+    const id = this.rolePermissionId++;
+    const now = new Date();
+    // Ensure all boolean fields are defined
+    const newPermission: RolePermission = {
+      ...permission,
+      id,
+      createdAt: now,
+      updatedAt: now,
+      canView: permission.canView === undefined ? false : permission.canView,
+      canCreate: permission.canCreate === undefined ? false : permission.canCreate,
+      canEdit: permission.canEdit === undefined ? false : permission.canEdit,
+      canDelete: permission.canDelete === undefined ? false : permission.canDelete
+    };
+    this.rolePermissions.set(id, newPermission);
+    
+    // Log activity
+    this.createActivity({
+      type: 'role',
+      action: 'create',
+      details: { role: newPermission.role, module: newPermission.module }
+    });
+    
+    return newPermission;
+  }
+
+  async updateRolePermission(id: number, permissionData: Partial<InsertRolePermission>): Promise<RolePermission | undefined> {
+    const permission = this.rolePermissions.get(id);
+    if (!permission) return undefined;
+    
+    const now = new Date();
+    const updatedPermission = { ...permission, ...permissionData, updatedAt: now };
+    this.rolePermissions.set(id, updatedPermission);
+    
+    // Log activity
+    this.createActivity({
+      type: 'role',
+      action: 'update',
+      details: { role: updatedPermission.role, module: updatedPermission.module }
+    });
+    
+    return updatedPermission;
+  }
+
+  async deleteRolePermission(id: number): Promise<boolean> {
+    const permission = this.rolePermissions.get(id);
+    if (!permission) return false;
+    
+    const success = this.rolePermissions.delete(id);
+    
+    if (success) {
+      // Log activity
+      this.createActivity({
+        type: 'role',
+        action: 'delete',
+        details: { role: permission.role, module: permission.module }
+      });
+    }
+    
+    return success;
+  }
+
+  // Check module permissions
+  async checkPermission(role: string, module: string, permission: 'view' | 'create' | 'edit' | 'delete'): Promise<boolean> {
+    // Superadmin always has all permissions
+    if (role === 'superadmin') return true;
+    
+    const rolePermission = await this.getRoleModulePermission(role, module);
+    if (!rolePermission) return false;
+    
+    switch (permission) {
+      case 'view':
+        return rolePermission.canView;
+      case 'create':
+        return rolePermission.canCreate;
+      case 'edit':
+        return rolePermission.canEdit;
+      case 'delete':
+        return rolePermission.canDelete;
+      default:
+        return false;
+    }
+  }
+
+  async getModulePermissions(role: string): Promise<Record<string, {canView: boolean, canCreate: boolean, canEdit: boolean, canDelete: boolean}>> {
+    // If superadmin, return all permissions
+    if (role === 'superadmin') {
+      const modules = [
+        'students', 
+        'classes', 
+        'fee_management', 
+        'fee_payments', 
+        'expenses', 
+        'inventory', 
+        'reports',
+        'settings',
+        'user_management',
+        'role_management'
+      ];
+      
+      const result: Record<string, {canView: boolean, canCreate: boolean, canEdit: boolean, canDelete: boolean}> = {};
+      
+      modules.forEach(module => {
+        result[module] = {
+          canView: true,
+          canCreate: true,
+          canEdit: true,
+          canDelete: true
+        };
+      });
+      
+      return result;
+    }
+    
+    // Otherwise get the role's permissions
+    const permissions = await this.getRolePermissions(role);
+    const result: Record<string, {canView: boolean, canCreate: boolean, canEdit: boolean, canDelete: boolean}> = {};
+    
+    permissions.forEach(perm => {
+      result[perm.module] = {
+        canView: perm.canView,
+        canCreate: perm.canCreate,
+        canEdit: perm.canEdit,
+        canDelete: perm.canDelete
+      };
+    });
+    
+    return result;
+  }
+
   private async initializeSampleData() {
     // Create a default admin user
     const adminExists = await this.getUserByUsername('admin');
@@ -1211,6 +1381,59 @@ export class MemStorage implements IStorage {
         role: 'superadmin',
         passwordHash: 'hashed_password' // In a real app, this would be properly hashed
       });
+    }
+    
+    // Create default role permissions with proper type definitions
+    // Helper function to create properly typed role permissions
+    const createPermissionConfig = (
+      role: "parent" | "teacher" | "officeadmin" | "superadmin", 
+      module: "students" | "classes" | "fee_management" | "fee_payments" | "expenses" | "inventory" | "reports" | "settings" | "user_management" | "role_management",
+      canView: boolean, 
+      canCreate: boolean, 
+      canEdit: boolean, 
+      canDelete: boolean
+    ) => {
+      return { role, module, canView, canCreate, canEdit, canDelete };
+    };
+    
+    // Parent role - can only view student and fee data related to their children
+    const parentPermissions = [
+      createPermissionConfig('parent', 'students', true, false, false, false),
+      createPermissionConfig('parent', 'fee_payments', true, true, false, false),
+    ];
+    
+    // Teacher role - can manage students and classes
+    const teacherPermissions = [
+      createPermissionConfig('teacher', 'students', true, true, true, false),
+      createPermissionConfig('teacher', 'classes', true, false, true, false),
+    ];
+    
+    // Office admin role - can manage most modules except user and role management
+    const officeAdminPermissions = [
+      createPermissionConfig('officeadmin', 'students', true, true, true, true),
+      createPermissionConfig('officeadmin', 'classes', true, true, true, true),
+      createPermissionConfig('officeadmin', 'fee_management', true, true, true, true),
+      createPermissionConfig('officeadmin', 'fee_payments', true, true, true, true),
+      createPermissionConfig('officeadmin', 'expenses', true, true, true, true),
+      createPermissionConfig('officeadmin', 'inventory', true, true, true, true),
+      createPermissionConfig('officeadmin', 'reports', true, false, false, false),
+      createPermissionConfig('officeadmin', 'settings', true, false, true, false),
+      createPermissionConfig('officeadmin', 'user_management', true, true, true, false),
+    ];
+    
+    // Combine all permissions
+    const allDefaultPermissions = [
+      ...parentPermissions, 
+      ...teacherPermissions, 
+      ...officeAdminPermissions
+    ];
+    
+    // Add default permissions if they don't exist
+    for (const permission of allDefaultPermissions) {
+      const existingPermission = await this.getRoleModulePermission(permission.role, permission.module);
+      if (!existingPermission) {
+        await this.createRolePermission(permission);
+      }
     }
     
     // Initial settings

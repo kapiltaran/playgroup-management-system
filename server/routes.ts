@@ -830,6 +830,151 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: "Failed to fetch settings" });
     }
   });
+  
+  // Role permission routes
+  app.get("/api/role-permissions", async (req: Request, res: Response) => {
+    try {
+      const role = req.query.role as string;
+      const permissions = await storage.getRolePermissions(role);
+      res.json(permissions);
+    } catch (error) {
+      console.error("Error fetching role permissions:", error);
+      res.status(500).json({ message: "Failed to fetch role permissions" });
+    }
+  });
+  
+  app.get("/api/role-permissions/:id", async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid permission ID" });
+      }
+      
+      const permission = await storage.getRolePermission(id);
+      if (!permission) {
+        return res.status(404).json({ message: "Permission not found" });
+      }
+      
+      res.json(permission);
+    } catch (error) {
+      console.error("Error fetching role permission:", error);
+      res.status(500).json({ message: "Failed to fetch role permission" });
+    }
+  });
+  
+  app.post("/api/role-permissions", async (req: Request, res: Response) => {
+    try {
+      // Check if the user has superadmin role
+      const userRole = req.body.userRole;
+      if (userRole !== 'superadmin') {
+        return res.status(403).json({ message: "Only superadmins can manage role permissions" });
+      }
+      
+      const { role, module, canView, canCreate, canEdit, canDelete } = req.body;
+      
+      // Validate required fields
+      if (!role || !module) {
+        return res.status(400).json({ message: "Role and module are required" });
+      }
+      
+      // Check if permission already exists
+      const existingPermission = await storage.getRoleModulePermission(role, module);
+      if (existingPermission) {
+        return res.status(400).json({ message: "Permission for this role and module already exists" });
+      }
+      
+      const newPermission = await storage.createRolePermission({
+        role,
+        module,
+        canView: canView === undefined ? false : canView,
+        canCreate: canCreate === undefined ? false : canCreate,
+        canEdit: canEdit === undefined ? false : canEdit,
+        canDelete: canDelete === undefined ? false : canDelete
+      });
+      
+      res.status(201).json(newPermission);
+    } catch (error) {
+      console.error("Error creating role permission:", error);
+      res.status(500).json({ message: "Failed to create role permission" });
+    }
+  });
+  
+  app.patch("/api/role-permissions/:id", async (req: Request, res: Response) => {
+    try {
+      // Check if the user has superadmin role
+      const userRole = req.body.userRole;
+      if (userRole !== 'superadmin') {
+        return res.status(403).json({ message: "Only superadmins can manage role permissions" });
+      }
+      
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid permission ID" });
+      }
+      
+      const { canView, canCreate, canEdit, canDelete } = req.body;
+      
+      // Get existing permission
+      const existingPermission = await storage.getRolePermission(id);
+      if (!existingPermission) {
+        return res.status(404).json({ message: "Permission not found" });
+      }
+      
+      // Update the permission
+      const updatedPermission = await storage.updateRolePermission(id, {
+        canView: canView !== undefined ? canView : existingPermission.canView,
+        canCreate: canCreate !== undefined ? canCreate : existingPermission.canCreate,
+        canEdit: canEdit !== undefined ? canEdit : existingPermission.canEdit,
+        canDelete: canDelete !== undefined ? canDelete : existingPermission.canDelete
+      });
+      
+      res.json(updatedPermission);
+    } catch (error) {
+      console.error("Error updating role permission:", error);
+      res.status(500).json({ message: "Failed to update role permission" });
+    }
+  });
+  
+  app.delete("/api/role-permissions/:id", async (req: Request, res: Response) => {
+    try {
+      // Check if the user has superadmin role
+      const userRole = req.query.userRole as string;
+      if (userRole !== 'superadmin') {
+        return res.status(403).json({ message: "Only superadmins can manage role permissions" });
+      }
+      
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid permission ID" });
+      }
+      
+      const success = await storage.deleteRolePermission(id);
+      if (!success) {
+        return res.status(404).json({ message: "Permission not found" });
+      }
+      
+      res.status(204).end();
+    } catch (error) {
+      console.error("Error deleting role permission:", error);
+      res.status(500).json({ message: "Failed to delete role permission" });
+    }
+  });
+  
+  // Module permissions check endpoint
+  app.get("/api/module-permissions", async (req: Request, res: Response) => {
+    try {
+      const role = req.query.role as string;
+      if (!role) {
+        return res.status(400).json({ message: "Role parameter is required" });
+      }
+      
+      const permissions = await storage.getModulePermissions(role);
+      res.json(permissions);
+    } catch (error) {
+      console.error("Error fetching module permissions:", error);
+      res.status(500).json({ message: "Failed to fetch module permissions" });
+    }
+  });
 
   app.get("/api/settings/:key", async (req: Request, res: Response) => {
     try {
