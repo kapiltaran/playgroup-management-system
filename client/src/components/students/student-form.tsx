@@ -36,12 +36,23 @@ import { Loader2 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 
 const formSchema = insertStudentSchema.extend({
+  fullName: z.string().min(2, "Full name must be at least 2 characters"),
   dateOfBirth: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, {
     message: "Date must be in format YYYY-MM-DD",
   }),
   gender: z.enum(["male", "female", "other"]),
+  guardianName: z.string().min(2, "Guardian name must be at least 2 characters"),
+  phone: z.string()
+    .min(6, "Phone number must be at least 6 digits")
+    .regex(/^[+]?[\d\s()-]+$/, "Phone number can only contain digits, +, spaces, () and -"),
+  email: z.string().email("Please enter a valid email address"),
+  address: z.string().optional(),
+  city: z.string().min(2, "City must be at least 2 characters"),
+  postalCode: z.string().min(3, "Postal/PIN code must be at least 3 characters"),
+  state: z.string().min(2, "State/Province must be at least 2 characters"),
+  country: z.string().min(2, "Country must be at least 2 characters"),
   status: z.enum(["active", "inactive", "on_leave"]),
-  createAccount: z.boolean().optional().default(false)
+  createAccount: z.boolean().optional().default(true)
 });
 
 type StudentFormValues = z.infer<typeof formSchema>;
@@ -77,9 +88,13 @@ export function StudentForm({
       phone: "",
       email: "",
       address: "",
+      city: "",
+      postalCode: "",
+      state: "",
+      country: "",
       status: "active",
       notes: "",
-      createAccount: false,
+      createAccount: true, // Set default to true
     },
   });
 
@@ -110,10 +125,18 @@ export function StudentForm({
         
         if (response.ok) {
           const data = await response.json();
-          toast({
-            title: "Account created successfully!",
-            description: `A parent account has been created for ${values.guardianName} with the email ${values.email}. A welcome email with login instructions has been sent.`,
-          });
+          
+          if (data.linked) {
+            toast({
+              title: "Student linked to existing account!",
+              description: `The student has been linked to an existing account with the email ${values.email}.`,
+            });
+          } else {
+            toast({
+              title: "Account created successfully!",
+              description: `A parent account has been created for ${values.guardianName} with the email ${values.email}. A welcome email with login instructions has been sent.`,
+            });
+          }
         } else {
           const error = await response.json();
           toast({
@@ -262,10 +285,10 @@ export function StudentForm({
                 name="address"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Address</FormLabel>
+                    <FormLabel>Address Line</FormLabel>
                     <FormControl>
                       <Textarea
-                        placeholder="Enter full address"
+                        placeholder="Enter street address"
                         className="resize-none"
                         value={field.value || ""}
                         onChange={field.onChange}
@@ -278,6 +301,66 @@ export function StudentForm({
                   </FormItem>
                 )}
               />
+              
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="city"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>City</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Enter city" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                <FormField
+                  control={form.control}
+                  name="postalCode"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Postal/PIN Code</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Enter postal/PIN code" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="state"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>State/Province</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Enter state/province" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                <FormField
+                  control={form.control}
+                  name="country"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Country</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Enter country" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
               
               <FormField
                 control={form.control}

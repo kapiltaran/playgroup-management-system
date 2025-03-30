@@ -103,71 +103,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Create parent account from student ID
-  app.post("/api/students/:id/create-account", async (req: Request, res: Response) => {
-    try {
-      const studentId = parseInt(req.params.id);
-      const student = await storage.getStudent(studentId);
-      
-      if (!student) {
-        return res.status(404).json({ message: "Student not found" });
-      }
-      
-      // Check if student has the required info
-      if (!student.email || !student.guardianName) {
-        return res.status(400).json({ 
-          message: "Student record is missing email or guardian name"
-        });
-      }
-      
-      // Check if there's already a user with this email
-      const existingUser = await storage.getUserByEmail(student.email);
-      if (existingUser) {
-        return res.status(409).json({ 
-          message: "A user account with this email already exists"
-        });
-      }
-      
-      // Get base URL for email links
-      const protocol = req.protocol;
-      const host = req.get('host') || 'localhost';
-      const baseUrl = `${protocol}://${host}`;
-      
-      // Use auth service to create user
-      const { user, password } = await createUserFromStudent(
-        storage,
-        studentId,
-        student.guardianName,
-        student.email,
-        baseUrl
-      );
-      
-      // Send welcome email
-      await sendWelcomeEmail(user, password, `${baseUrl}/login`);
-      
-      // Record activity
-      await storage.createActivity({
-        type: 'user',
-        action: 'create_parent_account',
-        details: {
-          message: `Created parent account for ${student.guardianName} (student: ${student.fullName})`,
-          studentId: student.id,
-          userId: user.id
-        }
-      });
-      
-      res.status(201).json({ 
-        message: "Parent account created successfully", 
-        userId: user.id 
-      });
-      
-    } catch (error) {
-      console.error("Error creating parent account:", error);
-      res.status(500).json({ 
-        message: "Failed to create parent account", 
-        error: (error as Error).message 
-      });
-    }
-  });
+
 
   // Expense routes
   app.get("/api/expenses", async (req: Request, res: Response) => {
@@ -1389,7 +1325,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Check if email is already registered
       const existingUser = await storage.getUserByEmail(student.email);
       if (existingUser) {
-        return res.status(409).json({ message: "Email is already registered with another account" });
+        // If user exists, associate the student with this user account
+        const updatedUser = await storage.updateUser(existingUser.id, { 
+          studentId: studentId 
+        });
+        
+        // Record the link in activity log
+        await storage.createActivity({
+          type: 'user',
+          action: 'link_student_to_account',
+          details: {
+            message: `Linked student ${student.fullName} to existing account for ${existingUser.fullName}`,
+            studentId: student.id,
+            userId: existingUser.id
+          }
+        });
+        
+        return res.status(200).json({ 
+          message: "Student linked to existing account successfully", 
+          user: {
+            id: existingUser.id,
+            username: existingUser.username,
+            email: existingUser.email,
+            role: existingUser.role
+          },
+          linked: true
+        });
       }
       
       // Create user from student
@@ -1397,7 +1358,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { user, password } = await createUserFromStudent(
         storage, 
         studentId, 
-        student.fullName, 
+        student.guardianName, 
         student.email,
         baseUrl
       );
@@ -1413,7 +1374,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           username: user.username,
           email: user.email,
           role: user.role
-        }
+        },
+        linked: false
       });
     } catch (error) {
       console.error("Error creating user account from student:", error);

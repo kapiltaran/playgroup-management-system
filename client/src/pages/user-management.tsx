@@ -176,24 +176,20 @@ export default function UserManagement() {
     queryFn: async ({ queryKey }) => {
       const [_, role] = queryKey;
       const url = role ? `/api/users?role=${role}` : '/api/users';
-      return apiRequest<User[]>({ url });
+      return apiRequest<User[]>("GET", url);
     }
   });
 
   // Query to get students for associating parents
   const { data: students } = useQuery({
     queryKey: ['/api/students'],
-    queryFn: async () => apiRequest<any[]>({ url: '/api/students' })
+    queryFn: async () => apiRequest<any[]>("GET", '/api/students')
   });
 
   // Create user mutation
   const createUser = useMutation({
     mutationFn: (userData: z.infer<typeof createUserSchema>) => {
-      return apiRequest({
-        url: '/api/users',
-        method: 'POST',
-        data: userData
-      });
+      return apiRequest('POST', '/api/users', userData);
     },
     onSuccess: () => {
       toast({
@@ -216,11 +212,7 @@ export default function UserManagement() {
   // Update user mutation
   const updateUser = useMutation({
     mutationFn: (data: { id: number, updates: Partial<z.infer<typeof editUserSchema>> }) => {
-      return apiRequest({
-        url: `/api/users/${data.id}`,
-        method: 'PATCH',
-        data: data.updates
-      });
+      return apiRequest('PATCH', `/api/users/${data.id}`, data.updates);
     },
     onSuccess: () => {
       toast({
@@ -243,11 +235,7 @@ export default function UserManagement() {
   // Change password mutation
   const changePassword = useMutation({
     mutationFn: (data: { id: number, passwordData: z.infer<typeof passwordChangeSchema> }) => {
-      return apiRequest({
-        url: `/api/users/${data.id}/password`,
-        method: 'POST',
-        data: data.passwordData
-      });
+      return apiRequest('POST', `/api/users/${data.id}/password`, data.passwordData);
     },
     onSuccess: () => {
       toast({
@@ -269,10 +257,7 @@ export default function UserManagement() {
   // Delete user mutation
   const deleteUser = useMutation({
     mutationFn: (id: number) => {
-      return apiRequest({
-        url: `/api/users/${id}`,
-        method: 'DELETE'
-      });
+      return apiRequest('DELETE', `/api/users/${id}`);
     },
     onSuccess: () => {
       toast({

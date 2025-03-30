@@ -59,9 +59,7 @@ export default function RoleManagement() {
     queryKey: ['/api/role-permissions', selectedRole],
     queryFn: async ({ queryKey }) => {
       const [_, role] = queryKey;
-      return apiRequest<RolePermission[]>({
-        url: `/api/role-permissions?role=${role}`
-      });
+      return apiRequest<RolePermission[]>("GET", `/api/role-permissions?role=${role}`);
     }
   });
 
@@ -70,9 +68,7 @@ export default function RoleManagement() {
     queryKey: ['/api/module-permissions', selectedRole],
     queryFn: async ({ queryKey }) => {
       const [_, role] = queryKey;
-      return apiRequest<Record<string, {canView: boolean, canCreate: boolean, canEdit: boolean, canDelete: boolean}>>({
-        url: `/api/module-permissions?role=${role}`
-      });
+      return apiRequest<Record<string, {canView: boolean, canCreate: boolean, canEdit: boolean, canDelete: boolean}>>("GET", `/api/module-permissions?role=${role}`);
     }
   });
 
@@ -86,11 +82,7 @@ export default function RoleManagement() {
       canEdit: boolean;
       canDelete: boolean;
       userRole: string;
-    }) => apiRequest({
-      url: '/api/role-permissions',
-      method: 'POST',
-      data: permissionData
-    }),
+    }) => apiRequest("POST", '/api/role-permissions', permissionData),
     onSuccess: () => {
       toast({
         title: 'Permission Created',
@@ -119,11 +111,7 @@ export default function RoleManagement() {
         canDelete?: boolean;
         userRole: string;
       }
-    }) => apiRequest({
-      url: `/api/role-permissions/${data.id}`,
-      method: 'PATCH',
-      data: data.updates
-    }),
+    }) => apiRequest('PATCH', `/api/role-permissions/${data.id}`, data.updates),
     onSuccess: () => {
       toast({
         title: 'Permission Updated',

@@ -50,10 +50,7 @@ function CurrencySettings() {
   // Query to fetch the current currency setting
   const { data: currencySetting, isLoading: isLoadingCurrency } = useQuery<CurrencySettings>({
     queryKey: ["/api/settings/currency"],
-    queryFn: () => apiRequest<CurrencySettings>({
-      url: "/api/settings/currency",
-      method: "GET"
-    }),
+    queryFn: () => apiRequest<CurrencySettings>("GET", "/api/settings/currency"),
   });
 
   const form = useForm<z.infer<typeof currencyFormSchema>>({
@@ -75,14 +72,10 @@ function CurrencySettings() {
   // Mutation to update the currency setting
   const updateCurrencyMutation = useMutation({
     mutationFn: (data: z.infer<typeof currencyFormSchema>) => {
-      return apiRequest({
-        url: "/api/settings",
-        method: "POST",
-        data: {
-          key: "currency",
-          value: data.value,
-          description: "Default currency for fees and expenses"
-        }
+      return apiRequest("POST", "/api/settings", {
+        key: "currency",
+        value: data.value,
+        description: "Default currency for fees and expenses"
       });
     },
     onSuccess: () => {
