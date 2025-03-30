@@ -39,9 +39,57 @@ export default function Students() {
   // Add student mutation
   const addStudentMutation = useMutation({
     mutationFn: async (newStudent: any) => {
-      console.log("API request to create student:", newStudent);
-      const response = await apiRequest("POST", "/api/students", newStudent);
-      console.log("API response from creating student:", response);
+      console.log("🔴 API request to create student:", newStudent);
+      
+      // Save the createAccount flag before removing it from payload
+      const shouldCreateAccount = newStudent.createAccount;
+      
+      // Remove createAccount as it's not part of the student schema
+      const studentData = { ...newStudent };
+      delete studentData.createAccount;
+      
+      console.log("🔴 Student data being sent to API:", studentData);
+      console.log("🔴 Should create parent account:", shouldCreateAccount);
+      
+      const response = await apiRequest("POST", "/api/students", studentData);
+      console.log("🔴 API response from creating student:", response);
+      
+      // If parent account should be created, make the API call
+      if (shouldCreateAccount && response && response.id) {
+        console.log("🔴 Attempting to create parent account for student ID:", response.id);
+        try {
+          // Direct API call to create parent account
+          const accountResponse = await fetch(`/api/students/${response.id}/create-account`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include'
+          });
+          
+          console.log("🔴 Parent account creation status:", accountResponse.status);
+          
+          if (accountResponse.ok) {
+            const accountData = await accountResponse.json();
+            console.log("🔴 Parent account created successfully:", accountData);
+            // Invalidate users query to refresh listings
+            queryClient.invalidateQueries({ queryKey: ['/api/users'] });
+            toast({
+              title: "Parent Account Created",
+              description: `Account created for ${studentData.guardianName} with email ${studentData.email}`,
+            });
+          } else {
+            const errorText = await accountResponse.text();
+            console.error("🔴 Error creating parent account:", errorText);
+            toast({
+              title: "Parent Account Creation Failed",
+              description: `Could not create account: ${errorText}`,
+              variant: "destructive"
+            });
+          }
+        } catch (accountError) {
+          console.error("🔴 Exception creating parent account:", accountError);
+        }
+      }
+      
       return response; // Make sure we return the response
     },
     onSuccess: (data) => {
