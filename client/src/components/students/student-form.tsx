@@ -137,13 +137,52 @@ export function StudentForm({
           const newStudent = await onSubmit(studentData);
           console.log("New student created:", newStudent);
           
-          // Make sure we have a valid student object with ID
+          // This part is critical - get the ID directly from the API response data
+          // not relying on the returned object which might be transformed by TanStack Query
+          
+          // If we get a non-object response
           if (!newStudent || typeof newStudent !== 'object') {
+            console.error("Invalid student creation response:", newStudent);
             throw new Error("Student creation failed - invalid response");
           }
           
-          console.log("New student ID:", newStudent.id);
-          studentId = newStudent.id;
+          if (!newStudent.id) {
+            // Try to get the student we just created by querying the API
+            console.log("Student created but ID missing, fetching latest student");
+            const latestStudents = await apiRequest("GET", "/api/students", null);
+            console.log("All students:", latestStudents);
+            
+            if (Array.isArray(latestStudents) && latestStudents.length > 0) {
+              // Find the matching student by checking all fields
+              const matchingStudent = latestStudents.find(s => 
+                s.fullName === studentData.fullName && 
+                s.email === studentData.email && 
+                s.guardianName === studentData.guardianName
+              );
+              
+              if (matchingStudent) {
+                console.log("Found matching student:", matchingStudent);
+                studentId = matchingStudent.id;
+              } else {
+                // Use the last created student as fallback
+                const lastStudent = latestStudents[latestStudents.length - 1];
+                console.log("Using last created student:", lastStudent);
+                studentId = lastStudent.id;
+              }
+            } else {
+              throw new Error("Failed to retrieve student ID after creation");
+            }
+          } else {
+            console.log("New student ID direct from response:", newStudent.id);
+            studentId = newStudent.id;
+          }
+          
+          // Extra validation
+          if (!studentId || typeof studentId !== 'number') {
+            throw new Error(`Invalid student ID: ${studentId}`);
+          }
+          
+          console.log("Using student ID for account creation:", studentId);
           
           if (!createAccount) {
             toast({
@@ -163,35 +202,25 @@ export function StudentForm({
           setCreatingAccount(true);
           
           try {
-            console.log("Making parent account creation API request for student ID:", studentId);
+            // Import and use the dedicated parent account creation function
+            const { createParentAccount } = await import('./create-parent-account');
+            
+            console.log("Using dedicated createParentAccount function for student ID:", studentId);
             
             if (!studentId) {
               throw new Error("Student ID is undefined. Cannot create parent account.");
             }
             
-            // Use apiRequest helper instead of fetch to ensure consistent URL formatting
-            // apiRequest directly returns the JSON response data, not a Response object
-            const responseData = await apiRequest(
-              "POST", 
-              `/api/students/${studentId}/create-account`, 
-              null
-            );
-            console.log("Account creation response:", responseData);
+            const success = await createParentAccount(studentId);
+            console.log("Parent account creation success:", success);
             
             // Invalidate the users cache to refresh the user management page
             queryClient.invalidateQueries({ queryKey: ['/api/users'] });
             
-            if (responseData.linked) {
-              toast({
-                title: "Student linked to existing account!",
-                description: `The student has been linked to an existing account with the email ${values.email}.`,
-              });
-            } else {
-              toast({
-                title: "Account created successfully!",
-                description: `A parent account has been created for ${values.guardianName} with the email ${values.email}. A welcome email with login instructions has been sent.`,
-              });
-            }
+            toast({
+              title: "Account created successfully!",
+              description: `A parent account has been created for ${values.guardianName} with the email ${values.email}. A welcome email with login instructions has been sent.`,
+            });
           } catch (error: any) {
             console.error("Error creating parent account:", error);
             toast({
