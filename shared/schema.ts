@@ -1,6 +1,9 @@
-import { pgTable, text, serial, integer, boolean, numeric, timestamp, json, date, foreignKey } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, numeric, timestamp, json, date, foreignKey, pgEnum } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
+
+// Role definition using enum
+export const roleEnum = pgEnum('role', ['parent', 'teacher', 'officeadmin', 'superadmin']);
 
 // Class schema
 export const classes = pgTable("classes", {
@@ -152,6 +155,33 @@ export const insertActivitySchema = createInsertSchema(activities).omit({
   timestamp: true,
 });
 
+// User schema with roles
+export const users = pgTable("users", {
+  id: serial("id").primaryKey(),
+  username: text("username").notNull().unique(),
+  email: text("email").notNull().unique(),
+  passwordHash: text("password_hash").notNull(),
+  fullName: text("full_name").notNull(),
+  role: roleEnum("role").notNull().default("parent"),
+  active: boolean("active").notNull().default(true),
+  studentId: integer("student_id").references(() => students.id), // For parent role, linking to their child
+  createdAt: timestamp("created_at").defaultNow(),
+  lastLogin: timestamp("last_login"),
+});
+
+export const insertUserSchema = createInsertSchema(users).omit({
+  id: true,
+  passwordHash: true, // We'll handle password hashing separately
+  createdAt: true,
+  lastLogin: true,
+}).extend({
+  password: z.string().min(8, "Password must be at least 8 characters"),
+  confirmPassword: z.string(),
+}).refine(data => data.password === data.confirmPassword, {
+  message: "Passwords do not match",
+  path: ["confirmPassword"],
+});
+
 // Settings schema
 export const settings = pgTable("settings", {
   id: serial("id").primaryKey(),
@@ -185,5 +215,7 @@ export type Inventory = typeof inventory.$inferSelect;
 export type InsertInventory = z.infer<typeof insertInventorySchema>;
 export type Activity = typeof activities.$inferSelect;
 export type InsertActivity = z.infer<typeof insertActivitySchema>;
+export type User = typeof users.$inferSelect;
+export type InsertUser = z.infer<typeof insertUserSchema>;
 export type Setting = typeof settings.$inferSelect;
 export type InsertSetting = z.infer<typeof insertSettingsSchema>;

@@ -18,7 +18,9 @@ import {
   type Reminder,
   type InsertReminder,
   type Setting,
-  type InsertSetting
+  type InsertSetting,
+  type User,
+  type InsertUser
 } from "@shared/schema";
 
 // Storage interface
@@ -95,6 +97,18 @@ export interface IStorage {
   getSetting(key: string): Promise<Setting | undefined>;
   createOrUpdateSetting(setting: InsertSetting): Promise<Setting>;
   deleteSetting(id: number): Promise<boolean>;
+  
+  // User methods
+  getUsers(): Promise<User[]>;
+  getUsersByRole(role: string): Promise<User[]>;
+  getUserByUsername(username: string): Promise<User | undefined>;
+  getUserByEmail(email: string): Promise<User | undefined>;
+  getUser(id: number): Promise<User | undefined>;
+  createUser(userData: Omit<InsertUser, 'password' | 'confirmPassword'> & { passwordHash: string }): Promise<User>;
+  updateUser(id: number, userData: Partial<Omit<InsertUser, 'password' | 'confirmPassword'>>): Promise<User | undefined>;
+  updateUserPassword(id: number, passwordHash: string): Promise<boolean>;
+  deleteUser(id: number): Promise<boolean>;
+  updateLastLogin(id: number): Promise<boolean>;
 }
 
 export class MemStorage implements IStorage {
@@ -108,6 +122,7 @@ export class MemStorage implements IStorage {
   private feePayments: Map<number, FeePayment>;
   private reminders: Map<number, Reminder>;
   private settings: Map<number, Setting>;
+  private users: Map<number, User>;
   
   private studentId: number;
   private expenseId: number;
@@ -119,6 +134,7 @@ export class MemStorage implements IStorage {
   private feePaymentId: number;
   private reminderId: number;
   private settingId: number;
+  private userId: number;
 
   constructor() {
     this.students = new Map();
@@ -131,6 +147,7 @@ export class MemStorage implements IStorage {
     this.feePayments = new Map();
     this.reminders = new Map();
     this.settings = new Map();
+    this.users = new Map();
     
     this.studentId = 1;
     this.expenseId = 1;
@@ -142,6 +159,7 @@ export class MemStorage implements IStorage {
     this.feePaymentId = 1;
     this.reminderId = 1;
     this.settingId = 1;
+    this.userId = 1;
     
     // Initialize with sample data asynchronously
     setTimeout(() => {
@@ -1063,7 +1081,138 @@ export class MemStorage implements IStorage {
   }
 
   // Initialize sample data
+  // User methods
+  async getUsers(): Promise<User[]> {
+    return Array.from(this.users.values()).sort((a, b) => b.id - a.id);
+  }
+
+  async getUsersByRole(role: string): Promise<User[]> {
+    return Array.from(this.users.values())
+      .filter(user => user.role === role)
+      .sort((a, b) => b.id - a.id);
+  }
+
+  async getUserByUsername(username: string): Promise<User | undefined> {
+    return Array.from(this.users.values()).find(user => user.username === username);
+  }
+
+  async getUserByEmail(email: string): Promise<User | undefined> {
+    return Array.from(this.users.values()).find(user => user.email === email);
+  }
+
+  async getUser(id: number): Promise<User | undefined> {
+    return this.users.get(id);
+  }
+
+  async createUser(userData: Omit<InsertUser, 'password' | 'confirmPassword'> & { passwordHash: string }): Promise<User> {
+    const id = this.userId++;
+    const now = new Date();
+    const user: User = {
+      ...userData,
+      id,
+      createdAt: now,
+      lastLogin: null,
+      active: userData.active !== undefined ? userData.active : true,
+      studentId: userData.studentId || null,
+      role: userData.role || 'parent' // Ensure role is never undefined
+    };
+    
+    this.users.set(id, user);
+    
+    // Log activity
+    this.createActivity({
+      type: 'user',
+      action: 'create',
+      details: { userId: id, username: user.username, role: user.role }
+    });
+    
+    return user;
+  }
+
+  async updateUser(id: number, userData: Partial<Omit<InsertUser, 'password' | 'confirmPassword'>>): Promise<User | undefined> {
+    const user = this.users.get(id);
+    if (!user) return undefined;
+    
+    const updatedUser = { ...user, ...userData };
+    this.users.set(id, updatedUser);
+    
+    // Log activity
+    this.createActivity({
+      type: 'user',
+      action: 'update',
+      details: { userId: id, username: updatedUser.username }
+    });
+    
+    return updatedUser;
+  }
+
+  async updateUserPassword(id: number, passwordHash: string): Promise<boolean> {
+    const user = this.users.get(id);
+    if (!user) return false;
+    
+    const updatedUser = { ...user, passwordHash };
+    this.users.set(id, updatedUser);
+    
+    // Log activity
+    this.createActivity({
+      type: 'user',
+      action: 'password_update',
+      details: { userId: id, username: user.username }
+    });
+    
+    return true;
+  }
+
+  async deleteUser(id: number): Promise<boolean> {
+    const user = this.users.get(id);
+    if (!user) return false;
+    
+    // Check if this is the last superadmin
+    if (user.role === 'superadmin') {
+      const superAdmins = Array.from(this.users.values()).filter(u => u.role === 'superadmin');
+      if (superAdmins.length <= 1) {
+        return false; // Cannot delete the last superadmin
+      }
+    }
+    
+    const success = this.users.delete(id);
+    
+    if (success) {
+      // Log activity
+      this.createActivity({
+        type: 'user',
+        action: 'delete',
+        details: { userId: id, username: user.username }
+      });
+    }
+    
+    return success;
+  }
+
+  async updateLastLogin(id: number): Promise<boolean> {
+    const user = this.users.get(id);
+    if (!user) return false;
+    
+    const now = new Date();
+    const updatedUser = { ...user, lastLogin: now };
+    this.users.set(id, updatedUser);
+    
+    return true;
+  }
+
   private async initializeSampleData() {
+    // Create a default admin user
+    const adminExists = await this.getUserByUsername('admin');
+    if (!adminExists) {
+      await this.createUser({
+        username: 'admin',
+        email: 'admin@playgroup.com',
+        fullName: 'Administrator',
+        role: 'superadmin',
+        passwordHash: 'hashed_password' // In a real app, this would be properly hashed
+      });
+    }
+    
     // Initial settings
     await this.createOrUpdateSetting({
       key: "currency",

@@ -11,7 +11,9 @@ import {
   insertFeeInstallmentSchema,
   insertFeePaymentSchema,
   insertReminderSchema,
-  insertSettingsSchema
+  insertSettingsSchema,
+  insertUserSchema,
+  roleEnum
 } from "@shared/schema";
 import { ZodError } from "zod";
 
@@ -872,6 +874,278 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error deleting setting:", error);
       res.status(500).json({ message: "Failed to delete setting" });
+    }
+  });
+
+  // User Management Routes
+  app.get("/api/users", async (req: Request, res: Response) => {
+    try {
+      // Optionally filter by role
+      const role = req.query.role as string | undefined;
+      let users;
+      
+      if (role && ['parent', 'teacher', 'officeadmin', 'superadmin'].includes(role)) {
+        users = await storage.getUsersByRole(role);
+      } else {
+        users = await storage.getUsers();
+      }
+      
+      // Remove sensitive data like passwordHash before sending
+      const safeUsers = users.map(user => {
+        const { passwordHash, ...safeUser } = user;
+        return safeUser;
+      });
+      
+      res.json(safeUsers);
+    } catch (error) {
+      console.error("Error fetching users:", error);
+      res.status(500).json({ message: "Failed to fetch users" });
+    }
+  });
+  
+  app.get("/api/users/:id", async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid user ID" });
+      }
+      
+      const user = await storage.getUser(id);
+      
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      
+      // Remove sensitive data
+      const { passwordHash, ...safeUser } = user;
+      
+      res.json(safeUser);
+    } catch (error) {
+      console.error("Error fetching user:", error);
+      res.status(500).json({ message: "Failed to fetch user" });
+    }
+  });
+  
+  app.post("/api/users", async (req: Request, res: Response) => {
+    try {
+      // Basic validation for required fields and password matching
+      const { username, email, fullName, password, confirmPassword, role, active, studentId } = req.body;
+      
+      // Validate required fields
+      if (!username || !email || !fullName || !password) {
+        return res.status(400).json({ 
+          message: "Validation error", 
+          errors: [{ message: "Required fields missing" }] 
+        });
+      }
+      
+      // Validate password length
+      if (password.length < 8) {
+        return res.status(400).json({ 
+          message: "Validation error", 
+          errors: [{ message: "Password must be at least 8 characters long" }] 
+        });
+      }
+      
+      // Validate password matching
+      if (password !== confirmPassword) {
+        return res.status(400).json({ 
+          message: "Validation error", 
+          errors: [{ message: "Passwords do not match" }] 
+        });
+      }
+      
+      // Validate role if provided
+      if (role && !['parent', 'teacher', 'officeadmin', 'superadmin'].includes(role)) {
+        return res.status(400).json({ 
+          message: "Validation error", 
+          errors: [{ message: "Invalid role value" }] 
+        });
+      }
+      
+      // Check if username already exists
+      const existingUsername = await storage.getUserByUsername(username);
+      if (existingUsername) {
+        return res.status(400).json({ message: "Username already taken" });
+      }
+      
+      // Check if email already exists
+      const existingEmail = await storage.getUserByEmail(email);
+      if (existingEmail) {
+        return res.status(400).json({ message: "Email already in use" });
+      }
+      
+      // In a real app, we would hash the password here
+      // For this demo, we'll just use a simple "hash" prefix
+      const passwordHash = `hashed_${password}`;
+      
+      // Prepare user data for storage
+      const userData = {
+        username,
+        email,
+        fullName,
+        role: role || 'parent',
+        active: active !== undefined ? active : true,
+        studentId: studentId || null,
+        passwordHash
+      };
+      
+      const newUser = await storage.createUser(userData);
+      
+      // Remove sensitive data before sending response
+      const { passwordHash: _, ...safeUser } = newUser;
+      
+      res.status(201).json(safeUser);
+    } catch (error) {
+      console.error("Error creating user:", error);
+      res.status(500).json({ message: "Failed to create user" });
+    }
+  });
+  
+  app.patch("/api/users/:id", async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid user ID" });
+      }
+      
+      // Get existing user to verify it exists
+      const existingUser = await storage.getUser(id);
+      if (!existingUser) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      
+      // Extract updatable fields, excluding password fields
+      const { username, email, fullName, role, active, studentId } = req.body;
+      
+      const updateData: Record<string, any> = {};
+      
+      // Only include fields that are provided
+      if (username !== undefined) updateData.username = username;
+      if (email !== undefined) updateData.email = email; 
+      if (fullName !== undefined) updateData.fullName = fullName;
+      if (role !== undefined) updateData.role = role;
+      if (active !== undefined) updateData.active = active;
+      if (studentId !== undefined) updateData.studentId = studentId;
+      
+      // Validate role if provided
+      if (updateData.role && !['parent', 'teacher', 'officeadmin', 'superadmin'].includes(updateData.role)) {
+        return res.status(400).json({ 
+          message: "Validation error", 
+          errors: [{ message: "Invalid role value" }] 
+        });
+      }
+      
+      // Check if username is being updated and if it already exists
+      if (updateData.username) {
+        const existingUsername = await storage.getUserByUsername(updateData.username);
+        if (existingUsername && existingUsername.id !== id) {
+          return res.status(400).json({ message: "Username already taken" });
+        }
+      }
+      
+      // Check if email is being updated and if it already exists
+      if (updateData.email) {
+        const existingEmail = await storage.getUserByEmail(updateData.email);
+        if (existingEmail && existingEmail.id !== id) {
+          return res.status(400).json({ message: "Email already in use" });
+        }
+      }
+      
+      const updatedUser = await storage.updateUser(id, updateData);
+      
+      if (!updatedUser) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      
+      // Remove sensitive data
+      const { passwordHash, ...safeUser } = updatedUser;
+      
+      res.json(safeUser);
+    } catch (error) {
+      console.error("Error updating user:", error);
+      res.status(500).json({ message: "Failed to update user" });
+    }
+  });
+  
+  app.post("/api/users/:id/password", async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid user ID" });
+      }
+      
+      // Get request fields
+      const { currentPassword, password, confirmPassword } = req.body;
+      
+      // Validate required fields
+      if (!currentPassword || !password || !confirmPassword) {
+        return res.status(400).json({ 
+          message: "Validation error", 
+          errors: [{ message: "All password fields are required" }] 
+        });
+      }
+      
+      // Validate new password length
+      if (password.length < 8) {
+        return res.status(400).json({ 
+          message: "Validation error", 
+          errors: [{ message: "New password must be at least 8 characters long" }] 
+        });
+      }
+      
+      // Validate that new passwords match
+      if (password !== confirmPassword) {
+        return res.status(400).json({ 
+          message: "Validation error", 
+          errors: [{ message: "New passwords do not match" }] 
+        });
+      }
+      
+      // Check if user exists
+      const user = await storage.getUser(id);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      
+      // In a real app, we would verify the current password here
+      // For demo purposes, we're skipping actual password verification
+      
+      // In a real app, we would hash the new password
+      const passwordHash = `hashed_${password}`;
+      
+      const success = await storage.updateUserPassword(id, passwordHash);
+      
+      if (!success) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      
+      res.status(200).json({ message: "Password updated successfully" });
+    } catch (error) {
+      console.error("Error updating user password:", error);
+      res.status(500).json({ message: "Failed to update user password" });
+    }
+  });
+  
+  app.delete("/api/users/:id", async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid user ID" });
+      }
+      
+      const success = await storage.deleteUser(id);
+      
+      if (!success) {
+        return res.status(400).json({ 
+          message: "Cannot delete user. It may be the last superadmin user." 
+        });
+      }
+      
+      res.status(204).end();
+    } catch (error) {
+      console.error("Error deleting user:", error);
+      res.status(500).json({ message: "Failed to delete user" });
     }
   });
 
