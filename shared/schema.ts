@@ -168,7 +168,7 @@ export const insertActivitySchema = createInsertSchema(activities).omit({
   timestamp: true,
 });
 
-// User schema with roles
+// User schema with roles, email verification and MFA
 export const users = pgTable("users", {
   id: serial("id").primaryKey(),
   username: text("username").notNull().unique(),
@@ -177,6 +177,13 @@ export const users = pgTable("users", {
   fullName: text("full_name").notNull(),
   role: roleEnum("role").notNull().default("parent"),
   active: boolean("active").notNull().default(true),
+  emailVerified: boolean("email_verified").notNull().default(false),
+  verificationToken: text("verification_token"),
+  verificationTokenExpires: timestamp("verification_token_expires"),
+  resetPasswordToken: text("reset_password_token"),
+  resetPasswordExpires: timestamp("reset_password_expires"),
+  mfaEnabled: boolean("mfa_enabled").notNull().default(false),
+  mfaSecret: text("mfa_secret"),
   studentId: integer("student_id").references(() => students.id), // For parent role, linking to their child
   createdAt: timestamp("created_at").defaultNow(),
   lastLogin: timestamp("last_login"),
@@ -187,6 +194,13 @@ export const insertUserSchema = createInsertSchema(users).omit({
   passwordHash: true, // We'll handle password hashing separately
   createdAt: true,
   lastLogin: true,
+  emailVerified: true,
+  verificationToken: true,
+  verificationTokenExpires: true,
+  resetPasswordToken: true,
+  resetPasswordExpires: true,
+  mfaEnabled: true,
+  mfaSecret: true,
 }).extend({
   password: z.string().min(8, "Password must be at least 8 characters"),
   confirmPassword: z.string(),

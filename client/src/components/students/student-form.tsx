@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -28,6 +29,11 @@ import {
   SheetTitle,
   SheetFooter
 } from "@/components/ui/sheet";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
+import { useToast } from "@/hooks/use-toast";
+import { Loader2 } from "lucide-react";
+import { apiRequest } from "@/lib/queryClient";
 
 const formSchema = insertStudentSchema.extend({
   dateOfBirth: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, {
@@ -35,6 +41,7 @@ const formSchema = insertStudentSchema.extend({
   }),
   gender: z.enum(["male", "female", "other"]),
   status: z.enum(["active", "inactive", "on_leave"]),
+  createAccount: z.boolean().optional().default(false)
 });
 
 type StudentFormValues = z.infer<typeof formSchema>;
@@ -42,9 +49,10 @@ type StudentFormValues = z.infer<typeof formSchema>;
 interface StudentFormProps {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (values: StudentFormValues) => void;
-  defaultValues?: Partial<StudentFormValues>;
+  onSubmit: (values: StudentFormValues) => Promise<any>; // Should return the created/updated student
+  defaultValues?: Partial<StudentFormValues> & { id?: number };
   isSubmitting?: boolean;
+  isEditing?: boolean;
 }
 
 export function StudentForm({
@@ -53,7 +61,11 @@ export function StudentForm({
   onSubmit,
   defaultValues,
   isSubmitting = false,
+  isEditing = false,
 }: StudentFormProps) {
+  const { toast } = useToast();
+  const [creatingAccount, setCreatingAccount] = useState(false);
+  
   const form = useForm<StudentFormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: defaultValues || {
@@ -67,11 +79,61 @@ export function StudentForm({
       address: "",
       status: "active",
       notes: "",
+      createAccount: false,
     },
   });
 
-  const handleSubmit = (values: StudentFormValues) => {
-    onSubmit(values);
+  const handleSubmit = async (values: StudentFormValues) => {
+    try {
+      // First submit student data
+      const studentData = { ...values };
+      const createAccount = studentData.createAccount;
+      // Remove createAccount as it's not part of the Student schema
+      if ('createAccount' in studentData) {
+        delete (studentData as any).createAccount;
+      }
+      
+      // Call the regular onSubmit provided by parent component
+      const result = await onSubmit(studentData);
+      
+      // If createAccount is selected and we're adding a new student (not editing)
+      // If result has an ID, use it for account creation
+      if (createAccount && !isEditing && result?.id) {
+        setCreatingAccount(true);
+        
+        const response = await fetch(`/api/students/${result.id}/create-account`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          toast({
+            title: "Account created successfully!",
+            description: `A parent account has been created for ${values.guardianName} with the email ${values.email}. A welcome email with login instructions has been sent.`,
+          });
+        } else {
+          const error = await response.json();
+          toast({
+            title: "Failed to create account",
+            description: error.message || "There was an error creating the parent account.",
+            variant: "destructive",
+          });
+        }
+        
+        setCreatingAccount(false);
+      }
+    } catch (error) {
+      console.error("Error in form submission:", error);
+      toast({
+        title: "Error saving data",
+        description: "There was a problem saving the student data. Please try again.",
+        variant: "destructive",
+      });
+      setCreatingAccount(false);
+    }
   };
 
   return (
@@ -180,7 +242,15 @@ export function StudentForm({
                   <FormItem>
                     <FormLabel>Email</FormLabel>
                     <FormControl>
-                      <Input placeholder="Enter email address" type="email" {...field} />
+                      <Input 
+                        placeholder="Enter email address" 
+                        type="email"
+                        value={field.value || ""}
+                        onChange={field.onChange}
+                        onBlur={field.onBlur}
+                        name={field.name}
+                        ref={field.ref}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -197,7 +267,11 @@ export function StudentForm({
                       <Textarea
                         placeholder="Enter full address"
                         className="resize-none"
-                        {...field}
+                        value={field.value || ""}
+                        onChange={field.onChange}
+                        onBlur={field.onBlur}
+                        name={field.name}
+                        ref={field.ref}
                       />
                     </FormControl>
                     <FormMessage />
@@ -241,13 +315,41 @@ export function StudentForm({
                       <Textarea
                         placeholder="Any additional notes"
                         className="resize-none"
-                        {...field}
+                        value={field.value || ""}
+                        onChange={field.onChange}
+                        onBlur={field.onBlur}
+                        name={field.name}
+                        ref={field.ref}
                       />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
+              
+              {!isEditing && (
+                <FormField
+                  control={form.control}
+                  name="createAccount"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
+                      <FormControl>
+                        <Checkbox
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
+                        />
+                      </FormControl>
+                      <div className="space-y-1 leading-none">
+                        <FormLabel>Create parent account</FormLabel>
+                        <p className="text-sm text-muted-foreground">
+                          This will create a parent user account with login access using the guardian's email.
+                          The system will send an email with a temporary password to access the account.
+                        </p>
+                      </div>
+                    </FormItem>
+                  )}
+                />
+              )}
               
               <SheetFooter className="mt-6 flex items-center justify-end space-x-3">
                 <Button
@@ -259,9 +361,16 @@ export function StudentForm({
                 </Button>
                 <Button
                   type="submit"
-                  disabled={isSubmitting}
+                  disabled={isSubmitting || creatingAccount}
                 >
-                  {isSubmitting ? "Saving..." : "Save Student"}
+                  {isSubmitting || creatingAccount ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      {creatingAccount ? "Creating account..." : "Saving..."}
+                    </>
+                  ) : (
+                    "Save Student"
+                  )}
                 </Button>
               </SheetFooter>
             </form>

@@ -16,6 +16,8 @@ import {
   roleEnum
 } from "@shared/schema";
 import { ZodError } from "zod";
+import { createUserFromStudent } from "./services/auth";
+import { sendWelcomeEmail } from "./services/email";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Error handling middleware
@@ -97,6 +99,73 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error deleting student:", error);
       res.status(500).json({ message: "Failed to delete student" });
+    }
+  });
+  
+  // Create parent account from student ID
+  app.post("/api/students/:id/create-account", async (req: Request, res: Response) => {
+    try {
+      const studentId = parseInt(req.params.id);
+      const student = await storage.getStudent(studentId);
+      
+      if (!student) {
+        return res.status(404).json({ message: "Student not found" });
+      }
+      
+      // Check if student has the required info
+      if (!student.email || !student.guardianName) {
+        return res.status(400).json({ 
+          message: "Student record is missing email or guardian name"
+        });
+      }
+      
+      // Check if there's already a user with this email
+      const existingUser = await storage.getUserByEmail(student.email);
+      if (existingUser) {
+        return res.status(409).json({ 
+          message: "A user account with this email already exists"
+        });
+      }
+      
+      // Get base URL for email links
+      const protocol = req.protocol;
+      const host = req.get('host') || 'localhost';
+      const baseUrl = `${protocol}://${host}`;
+      
+      // Use auth service to create user
+      const { user, password } = await createUserFromStudent(
+        storage,
+        studentId,
+        student.guardianName,
+        student.email,
+        baseUrl
+      );
+      
+      // Send welcome email
+      await sendWelcomeEmail(user, password, `${baseUrl}/login`);
+      
+      // Record activity
+      await storage.createActivity({
+        type: 'user',
+        action: 'create_parent_account',
+        details: {
+          message: `Created parent account for ${student.guardianName} (student: ${student.fullName})`,
+          studentId: student.id,
+          userId: user.id
+        }
+      });
+      
+      res.status(201).json({ 
+        message: "Parent account created successfully", 
+        userId: user.id 
+      });
+      
+    } catch (error) {
+      console.error("Error creating parent account:", error);
+      res.status(500).json({ 
+        message: "Failed to create parent account", 
+        error: (error as Error).message 
+      });
     }
   });
 
@@ -1291,6 +1360,64 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error deleting user:", error);
       res.status(500).json({ message: "Failed to delete user" });
+    }
+  });
+  
+  // Create user account from student
+  app.post("/api/students/:id/create-account", async (req: Request, res: Response) => {
+    try {
+      // Import necessary services
+      const { createUserFromStudent } = await import('./services/auth');
+      const { sendWelcomeEmail } = await import('./services/email');
+      
+      const studentId = parseInt(req.params.id);
+      if (isNaN(studentId)) {
+        return res.status(400).json({ message: "Invalid student ID format" });
+      }
+      
+      // Get the student
+      const student = await storage.getStudent(studentId);
+      if (!student) {
+        return res.status(404).json({ message: "Student not found" });
+      }
+      
+      // Check if student has an email
+      if (!student.email) {
+        return res.status(400).json({ message: "Student must have an email to create an account" });
+      }
+      
+      // Check if email is already registered
+      const existingUser = await storage.getUserByEmail(student.email);
+      if (existingUser) {
+        return res.status(409).json({ message: "Email is already registered with another account" });
+      }
+      
+      // Create user from student
+      const baseUrl = `${req.protocol}://${req.get('host')}`;
+      const { user, password } = await createUserFromStudent(
+        storage, 
+        studentId, 
+        student.fullName, 
+        student.email,
+        baseUrl
+      );
+      
+      // Send welcome email with temporary password
+      const loginUrl = `${baseUrl}/login`;
+      await sendWelcomeEmail(user, password, loginUrl);
+      
+      res.status(201).json({ 
+        message: "User account created successfully",
+        user: {
+          id: user.id,
+          username: user.username,
+          email: user.email,
+          role: user.role
+        }
+      });
+    } catch (error) {
+      console.error("Error creating user account from student:", error);
+      res.status(500).json({ message: "Failed to create user account" });
     }
   });
 

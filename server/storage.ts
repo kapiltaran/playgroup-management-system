@@ -106,8 +106,25 @@ export interface IStorage {
   getUserByUsername(username: string): Promise<User | undefined>;
   getUserByEmail(email: string): Promise<User | undefined>;
   getUser(id: number): Promise<User | undefined>;
-  createUser(userData: Omit<InsertUser, 'password' | 'confirmPassword'> & { passwordHash: string }): Promise<User>;
-  updateUser(id: number, userData: Partial<Omit<InsertUser, 'password' | 'confirmPassword'>>): Promise<User | undefined>;
+  createUser(userData: Omit<InsertUser, 'password' | 'confirmPassword'> & { 
+    passwordHash: string,
+    emailVerified?: boolean,
+    verificationToken?: string | null,
+    verificationTokenExpires?: Date | null,
+    resetPasswordToken?: string | null,
+    resetPasswordExpires?: Date | null,
+    mfaEnabled?: boolean,
+    mfaSecret?: string | null
+  }): Promise<User>;
+  updateUser(id: number, userData: Partial<Omit<InsertUser, 'password' | 'confirmPassword'>> & {
+    emailVerified?: boolean,
+    verificationToken?: string | null,
+    verificationTokenExpires?: Date | null,
+    resetPasswordToken?: string | null,
+    resetPasswordExpires?: Date | null,
+    mfaEnabled?: boolean,
+    mfaSecret?: string | null
+  }): Promise<User | undefined>;
   updateUserPassword(id: number, passwordHash: string): Promise<boolean>;
   deleteUser(id: number): Promise<boolean>;
   updateLastLogin(id: number): Promise<boolean>;
@@ -1133,7 +1150,14 @@ export class MemStorage implements IStorage {
       lastLogin: null,
       active: userData.active !== undefined ? userData.active : true,
       studentId: userData.studentId || null,
-      role: userData.role || 'parent' // Ensure role is never undefined
+      role: userData.role || 'parent', // Ensure role is never undefined
+      emailVerified: userData.emailVerified !== undefined ? userData.emailVerified : false,
+      verificationToken: userData.verificationToken || null,
+      verificationTokenExpires: userData.verificationTokenExpires || null,
+      resetPasswordToken: userData.resetPasswordToken || null,
+      resetPasswordExpires: userData.resetPasswordExpires || null,
+      mfaEnabled: userData.mfaEnabled !== undefined ? userData.mfaEnabled : false,
+      mfaSecret: userData.mfaSecret || null
     };
     
     this.users.set(id, user);
@@ -1379,7 +1403,10 @@ export class MemStorage implements IStorage {
         email: 'admin@playgroup.com',
         fullName: 'Administrator',
         role: 'superadmin',
-        passwordHash: 'hashed_password' // In a real app, this would be properly hashed
+        passwordHash: 'hashed_password', // In a real app, this would be properly hashed
+        emailVerified: true,
+        mfaEnabled: false,
+        active: true
       });
     }
     
