@@ -37,11 +37,15 @@ export default function FeeManagement() {
   const [installmentFormMode, setInstallmentFormMode] = useState<"add" | "edit">("add");
   const [currentInstallment, setCurrentInstallment] = useState<FeeInstallment | null>(null);
   const [selectedStructureId, setSelectedStructureId] = useState<number | null>(null);
+  // Format today's date as YYYY-MM-DD for the date input
+  const today = new Date();
+  const formattedDate = today.toISOString().split('T')[0];
+  
   const [installmentFormData, setInstallmentFormData] = useState({
     feeStructureId: 0,
     name: "",
     amount: "",
-    dueDate: ""
+    dueDate: formattedDate
   });
 
   // Fetch classes for dropdown
@@ -206,11 +210,15 @@ export default function FeeManagement() {
 
   // Reset fee installment form
   const resetInstallmentForm = () => {
+    // Format today's date as YYYY-MM-DD for the date input
+    const today = new Date();
+    const formattedDate = today.toISOString().split('T')[0];
+    
     setInstallmentFormData({
       feeStructureId: selectedStructureId || 0,
       name: "",
       amount: "",
-      dueDate: ""
+      dueDate: formattedDate
     });
     setCurrentInstallment(null);
   };
