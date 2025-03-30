@@ -1,14 +1,15 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
-import { format, subDays } from "date-fns";
+import { format, subDays, isAfter, parseISO } from "date-fns";
 import { Link } from "wouter";
 import { 
   UsersIcon, 
   DollarSignIcon, 
   PackageIcon, 
   AlertCircleIcon, 
-  ArrowUpIcon 
+  ArrowUpIcon,
+  UserPlusIcon
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -20,7 +21,7 @@ import { DataTable } from "@/components/ui/data-table";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { apiRequest } from "@/lib/queryClient";
-import type { Activity, Student, Expense } from "@shared/schema";
+import type { Activity, Student, Expense, User } from "@shared/schema";
 
 export default function Dashboard() {
   const [isStudentFormOpen, setIsStudentFormOpen] = useState(false);
@@ -47,6 +48,22 @@ export default function Dashboard() {
   const { data: expenses, isLoading: isLoadingExpenses } = useQuery<Expense[]>({
     queryKey: ["/api/expenses"],
     select: (data) => data.slice(0, 3),
+  });
+  
+  // Fetch recently created users
+  const { data: users, isLoading: isLoadingUsers } = useQuery<User[]>({
+    queryKey: ["/api/users"],
+    select: (data) => {
+      // Get users created in the last 30 days who are parents
+      const thirtyDaysAgo = subDays(new Date(), 30);
+      return data
+        .filter(user => 
+          user.role === 'parent' && 
+          user.createdAt && 
+          isAfter(parseISO(user.createdAt.toString()), thirtyDaysAgo)
+        )
+        .slice(0, 3);
+    }
   });
 
   // Fetch expense report data for chart
@@ -79,6 +96,8 @@ export default function Dashboard() {
 
   // Helper to format date relative to now
   const formatRelativeDate = (dateString: string) => {
+    if (!dateString) return "N/A";
+    
     const date = new Date(dateString);
     const now = new Date();
     
@@ -241,7 +260,7 @@ export default function Dashboard() {
                         type={activity.type as any}
                         action={activity.action as any}
                         title={title}
-                        timestamp={formatRelativeDate(activity.timestamp.toString())}
+                        timestamp={formatRelativeDate(activity.timestamp ? activity.timestamp.toString() : '')}
                       />
                     );
                   })}
@@ -262,9 +281,9 @@ export default function Dashboard() {
         </Card>
       </div>
 
-      {/* Students and Expenses section */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <Card>
+      {/* Students, New Users, and Expenses section */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <Card className="lg:col-span-1">
           <CardHeader className="flex flex-row items-center justify-between py-4">
             <CardTitle className="text-lg font-semibold">Recent Students</CardTitle>
             <Link href="/students">
@@ -294,13 +313,6 @@ export default function Dashboard() {
                   )
                 },
                 {
-                  accessorKey: "age",
-                  header: "Age",
-                  cell: (student) => (
-                    <div className="text-sm text-gray-900">{student.age} years</div>
-                  )
-                },
-                {
                   accessorKey: "guardianName",
                   header: "Guardian",
                   cell: (student) => (
@@ -320,7 +332,59 @@ export default function Dashboard() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="lg:col-span-1">
+          <CardHeader className="flex flex-row items-center justify-between py-4">
+            <CardTitle className="text-lg font-semibold">New Parent Accounts</CardTitle>
+            <Link href="/user-management">
+              <a className="text-sm text-primary font-medium">View all</a>
+            </Link>
+          </CardHeader>
+          <CardContent className="p-0">
+            <DataTable
+              data={users || []}
+              isLoading={isLoadingUsers}
+              columns={[
+                {
+                  accessorKey: "fullName",
+                  header: "Name",
+                  cell: (user) => (
+                    <div className="flex items-center">
+                      <Avatar className="h-10 w-10 bg-blue-100 text-blue-600">
+                        <AvatarFallback>
+                          {renderStudentInitials(user.fullName)}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="ml-4">
+                        <div className="text-sm font-medium text-gray-900">{user.fullName}</div>
+                        <div className="text-sm text-gray-500">{user.email}</div>
+                      </div>
+                    </div>
+                  )
+                },
+                {
+                  accessorKey: "createdAt",
+                  header: "Created",
+                  cell: (user) => (
+                    <div className="text-sm text-gray-500">
+                      {user.createdAt ? formatRelativeDate(user.createdAt.toString()) : "N/A"}
+                    </div>
+                  )
+                },
+                {
+                  accessorKey: "active",
+                  header: "Status",
+                  cell: (user) => (
+                    <Badge className={user.active ? "bg-green-100 text-green-800 hover:bg-green-100" : "bg-gray-100 text-gray-800 hover:bg-gray-100"}>
+                      {user.active ? "Active" : "Inactive"}
+                    </Badge>
+                  )
+                }
+              ]}
+            />
+          </CardContent>
+        </Card>
+
+        <Card className="lg:col-span-1">
           <CardHeader className="flex flex-row items-center justify-between py-4">
             <CardTitle className="text-lg font-semibold">Recent Expenses</CardTitle>
             <Link href="/expenses">
@@ -349,15 +413,6 @@ export default function Dashboard() {
                   header: "Amount",
                   cell: (expense) => (
                     <div className="text-sm text-gray-900">${parseFloat(expense.amount as string).toFixed(2)}</div>
-                  )
-                },
-                {
-                  accessorKey: "date",
-                  header: "Date",
-                  cell: (expense) => (
-                    <div className="text-sm text-gray-500">
-                      {format(new Date(expense.date), "MMM d, yyyy")}
-                    </div>
                   )
                 }
               ]}
