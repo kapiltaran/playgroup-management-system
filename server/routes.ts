@@ -1652,15 +1652,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       console.log("✅ Attempting account creation for student ID:", studentId);
       
-      // Get the student from database
+      // Get the student from database 
       // This line is critical - we need to ensure we're getting a valid student
+      // Try both available methods to get student data for maximum compatibility
+      // Simpler approach - just use the getStudent method which is confirmed to exist
+      console.log("🔍 Attempting to get student with ID:", studentId);
       const student = await storage.getStudent(studentId);
+      
       if (!student) {
-        console.error("Student not found with ID:", studentId);
+        console.error("❌ Student not found with ID:", studentId);
         return res.status(404).json({ message: "Student not found" });
       }
       
-      console.log("Found student:", { id: student.id, fullName: student.fullName, email: student.email });
+      console.log("✅ Successfully retrieved student:", { 
+        id: student.id,
+        fullName: student.fullName,
+        guardianName: student.guardianName,
+        email: student.email || "NO_EMAIL"
+      });
       
       // Check if student has an email
       if (!student.email) {

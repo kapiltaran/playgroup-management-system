@@ -13,6 +13,34 @@ export async function createParentAccount(studentId: number): Promise<boolean> {
     throw new Error("Invalid student ID. Cannot create parent account.");
   }
   
+  // Full detailed logging
+  console.log("📊 Global window object availability:", typeof window !== 'undefined');
+  console.log("📊 Global fetch availability:", typeof fetch !== 'undefined');
+  
+  // First verify the student exists
+  try {
+    const studentResponse = await fetch(`/api/students/${studentId}`, {
+      method: "GET",
+      credentials: "include"
+    });
+    
+    if (!studentResponse.ok) {
+      const errorText = await studentResponse.text();
+      console.error(`🚨 Error fetching student ${studentId}:`, errorText);
+      // Continue anyway - the server endpoint will handle this validation
+    } else {
+      const student = await studentResponse.json();
+      console.log("📋 Student found for account creation:", student);
+      // Check if student has valid email
+      if (!student.email) {
+        console.error("⚠️ Student has no email address, but we'll try anyway");
+      }
+    }
+  } catch (error) {
+    console.error("🚨 Error verifying student:", error);
+    // Continue anyway - the server endpoint will handle validation
+  }
+  
   // For diagnosis - directly use fetch to see if we have any issues with the API request
   const endpoint = `/api/students/${studentId}/create-account`;
   console.log("🌐 Attempting direct fetch to endpoint:", endpoint);
@@ -41,7 +69,33 @@ export async function createParentAccount(studentId: number): Promise<boolean> {
     return true;
   } catch (error) {
     console.error("❌ Error creating parent account:", error);
-    throw error;
+    
+    // Try a fallback approach with a slightly different endpoint format
+    try {
+      console.log("🔄 Attempting fallback with absolute URL");
+      const fetchResponse = await fetch(`http://${window.location.host}/api/students/${studentId}/create-account`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        credentials: "include"
+      });
+      
+      console.log("📝 Fallback fetch response status:", fetchResponse.status);
+      
+      if (!fetchResponse.ok) {
+        const errorText = await fetchResponse.text();
+        console.error("🚨 Fallback server error response:", errorText);
+        throw new Error(`Fallback API request failed: ${fetchResponse.status} ${errorText}`);
+      }
+      
+      const responseData = await fetchResponse.json();
+      console.log("✅ Fallback parent account creation response:", responseData);
+      return true;
+    } catch (fallbackError) {
+      console.error("❌ Fallback approach also failed:", fallbackError);
+      throw error; // Throw the original error
+    }
   }
 }
 

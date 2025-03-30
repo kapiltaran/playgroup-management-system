@@ -104,7 +104,8 @@ export function StudentForm({
       // First submit student data
       const studentData = { ...values };
       const createAccount = studentData.createAccount;
-      console.log("Form submission with createAccount:", createAccount);
+      console.log("🔴 CRITICAL DEBUG - Form submission with createAccount:", createAccount);
+      console.log("🔴 CRITICAL DEBUG - Form values:", JSON.stringify(values, null, 2));
       
       // Remove createAccount as it's not part of the Student schema
       if ('createAccount' in studentData) {
@@ -496,27 +497,33 @@ export function StudentForm({
               />
               
               {!isEditing && (
-                <FormField
-                  control={form.control}
-                  name="createAccount"
-                  render={({ field }) => (
-                    <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
-                      <FormControl>
-                        <Checkbox
-                          checked={field.value}
-                          onCheckedChange={field.onChange}
-                        />
-                      </FormControl>
-                      <div className="space-y-1 leading-none">
-                        <FormLabel>Create parent account</FormLabel>
-                        <p className="text-sm text-muted-foreground">
-                          This will create a parent user account with login access using the guardian's email.
-                          The system will send an email with a temporary password to access the account.
-                        </p>
-                      </div>
-                    </FormItem>
-                  )}
-                />
+                <div>
+                  <FormField
+                    control={form.control}
+                    name="createAccount"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
+                        <FormControl>
+                          <Checkbox
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                          />
+                        </FormControl>
+                        <div className="space-y-1 leading-none">
+                          <FormLabel>Create parent account</FormLabel>
+                          <p className="text-sm text-muted-foreground">
+                            This will create a parent user account with login access using the guardian's email.
+                            The system will send an email with a temporary password to access the account.
+                          </p>
+                        </div>
+                      </FormItem>
+                    )}
+                  />
+                  <div className="mt-2 text-xs text-muted-foreground">
+                    If you select this option, after saving the student, a parent account will be automatically 
+                    created using the guardian's name and email.
+                  </div>
+                </div>
               )}
               
               <SheetFooter className="mt-6 flex items-center justify-end space-x-3">
