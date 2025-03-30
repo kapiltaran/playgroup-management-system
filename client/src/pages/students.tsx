@@ -287,6 +287,45 @@ export default function Students() {
                     <Button variant="outline" size="sm" onClick={() => handleDeleteStudent(student)}>
                       <Trash2Icon className="h-4 w-4" />
                     </Button>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={async () => {
+                        try {
+                          console.log("Creating parent account for student:", student.id);
+                          const response = await fetch(`/api/students/${student.id}/create-account`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            credentials: 'include'
+                          });
+                          
+                          if (response.ok) {
+                            const data = await response.json();
+                            toast({
+                              title: "Success",
+                              description: `Parent account created for ${student.guardianName} with email ${student.email}`,
+                            });
+                            queryClient.invalidateQueries({ queryKey: ['/api/users'] });
+                            console.log("Parent account created:", data);
+                          } else {
+                            const error = await response.text();
+                            toast({
+                              title: "Error",
+                              description: `Failed to create parent account: ${error}`,
+                              variant: "destructive",
+                            });
+                          }
+                        } catch (error) {
+                          toast({
+                            title: "Error",
+                            description: `Failed to create parent account: ${error}`,
+                            variant: "destructive",
+                          });
+                        }
+                      }}
+                    >
+                      Create Account
+                    </Button>
                   </div>
                 )
               }
