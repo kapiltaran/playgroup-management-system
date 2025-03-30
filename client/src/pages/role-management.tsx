@@ -25,6 +25,9 @@ type Permission = {
   updatedAt: string;
 };
 
+// Alias for consistent type referencing
+type RolePermission = Permission;
+
 // Format module name for display
 const formatModule = (moduleName: string) => {
   return moduleName
@@ -52,11 +55,13 @@ export default function RoleManagement() {
   ];
 
   // Query to get permissions for the selected role
-  const { data: permissions, isLoading, isError } = useQuery({
+  const { data: permissions, isLoading, isError } = useQuery<RolePermission[]>({
     queryKey: ['/api/role-permissions', selectedRole],
     queryFn: async ({ queryKey }) => {
       const [_, role] = queryKey;
-      return apiRequest<Permission[]>(`/api/role-permissions?role=${role}`);
+      return apiRequest<RolePermission[]>({
+        url: `/api/role-permissions?role=${role}`
+      });
     }
   });
 
@@ -65,7 +70,9 @@ export default function RoleManagement() {
     queryKey: ['/api/module-permissions', selectedRole],
     queryFn: async ({ queryKey }) => {
       const [_, role] = queryKey;
-      return apiRequest<Record<string, {canView: boolean, canCreate: boolean, canEdit: boolean, canDelete: boolean}>>(`/api/module-permissions?role=${role}`);
+      return apiRequest<Record<string, {canView: boolean, canCreate: boolean, canEdit: boolean, canDelete: boolean}>>({
+        url: `/api/module-permissions?role=${role}`
+      });
     }
   });
 
@@ -206,170 +213,168 @@ export default function RoleManagement() {
   }
 
   return (
-    <div className="container mx-auto p-4">
-      <Card className="w-full">
-        <CardHeader>
-          <CardTitle className="text-2xl">Role Permissions Management</CardTitle>
-          <CardDescription>
-            Configure access permissions for different user roles in the system
-          </CardDescription>
-        </CardHeader>
-        
-        <CardContent>
-          <div className="mb-6">
-            <Label htmlFor="role-select">Select Role</Label>
-            <Select 
-              value={selectedRole} 
-              onValueChange={handleRoleChange}
-            >
-              <SelectTrigger id="role-select" className="w-[200px]">
-                <SelectValue placeholder="Select Role" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="parent">Parent</SelectItem>
-                <SelectItem value="teacher">Teacher</SelectItem>
-                <SelectItem value="officeadmin">Office Admin</SelectItem>
-                <SelectItem value="superadmin">Super Admin</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+    <Card className="w-full">
+      <CardHeader>
+        <CardTitle className="text-2xl">Role Permissions Management</CardTitle>
+        <CardDescription>
+          Configure access permissions for different user roles in the system
+        </CardDescription>
+      </CardHeader>
+      
+      <CardContent>
+        <div className="mb-6">
+          <Label htmlFor="role-select">Select Role</Label>
+          <Select 
+            value={selectedRole} 
+            onValueChange={handleRoleChange}
+          >
+            <SelectTrigger id="role-select" className="w-[200px]">
+              <SelectValue placeholder="Select Role" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="parent">Parent</SelectItem>
+              <SelectItem value="teacher">Teacher</SelectItem>
+              <SelectItem value="officeadmin">Office Admin</SelectItem>
+              <SelectItem value="superadmin">Super Admin</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
 
-          {selectedRole === 'superadmin' ? (
-            <Alert className="mb-6">
-              <AlertTitle>Super Admin Role</AlertTitle>
-              <AlertDescription>
-                Super administrators have full access to all modules and features. These permissions cannot be modified.
-              </AlertDescription>
-            </Alert>
-          ) : (
-            <Tabs defaultValue="table">
-              <TabsList className="mb-4">
-                <TabsTrigger value="table">Table View</TabsTrigger>
-                <TabsTrigger value="list">List View</TabsTrigger>
-              </TabsList>
-              
-              <TabsContent value="table" className="space-y-4">
-                <div className="overflow-x-auto">
-                  <table className="w-full border-collapse">
-                    <thead>
-                      <tr className="bg-muted">
-                        <th className="p-2 text-left">Module</th>
-                        <th className="p-2 text-center">View</th>
-                        <th className="p-2 text-center">Create</th>
-                        <th className="p-2 text-center">Edit</th>
-                        <th className="p-2 text-center">Delete</th>
+        {selectedRole === 'superadmin' ? (
+          <Alert className="mb-6">
+            <AlertTitle>Super Admin Role</AlertTitle>
+            <AlertDescription>
+              Super administrators have full access to all modules and features. These permissions cannot be modified.
+            </AlertDescription>
+          </Alert>
+        ) : (
+          <Tabs defaultValue="table">
+            <TabsList className="mb-4">
+              <TabsTrigger value="table">Table View</TabsTrigger>
+              <TabsTrigger value="list">List View</TabsTrigger>
+            </TabsList>
+            
+            <TabsContent value="table" className="space-y-4">
+              <div className="overflow-x-auto">
+                <table className="w-full border-collapse">
+                  <thead>
+                    <tr className="bg-muted">
+                      <th className="p-2 text-left">Module</th>
+                      <th className="p-2 text-center">View</th>
+                      <th className="p-2 text-center">Create</th>
+                      <th className="p-2 text-center">Edit</th>
+                      <th className="p-2 text-center">Delete</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {modules.map((module) => (
+                      <tr key={module} className="border-b border-muted">
+                        <td className="p-2 font-medium">{formatModule(module)}</td>
+                        <td className="p-2 text-center">
+                          <Switch
+                            checked={getPermissionState(module, 'canView')}
+                            onCheckedChange={(value) => 
+                              handlePermissionChange(module, 'canView', value)
+                            }
+                          />
+                        </td>
+                        <td className="p-2 text-center">
+                          <Switch
+                            checked={getPermissionState(module, 'canCreate')}
+                            onCheckedChange={(value) => 
+                              handlePermissionChange(module, 'canCreate', value)
+                            }
+                          />
+                        </td>
+                        <td className="p-2 text-center">
+                          <Switch
+                            checked={getPermissionState(module, 'canEdit')}
+                            onCheckedChange={(value) => 
+                              handlePermissionChange(module, 'canEdit', value)
+                            }
+                          />
+                        </td>
+                        <td className="p-2 text-center">
+                          <Switch
+                            checked={getPermissionState(module, 'canDelete')}
+                            onCheckedChange={(value) => 
+                              handlePermissionChange(module, 'canDelete', value)
+                            }
+                          />
+                        </td>
                       </tr>
-                    </thead>
-                    <tbody>
-                      {modules.map((module) => (
-                        <tr key={module} className="border-b border-muted">
-                          <td className="p-2 font-medium">{formatModule(module)}</td>
-                          <td className="p-2 text-center">
-                            <Switch
-                              checked={getPermissionState(module, 'canView')}
-                              onCheckedChange={(value) => 
-                                handlePermissionChange(module, 'canView', value)
-                              }
-                            />
-                          </td>
-                          <td className="p-2 text-center">
-                            <Switch
-                              checked={getPermissionState(module, 'canCreate')}
-                              onCheckedChange={(value) => 
-                                handlePermissionChange(module, 'canCreate', value)
-                              }
-                            />
-                          </td>
-                          <td className="p-2 text-center">
-                            <Switch
-                              checked={getPermissionState(module, 'canEdit')}
-                              onCheckedChange={(value) => 
-                                handlePermissionChange(module, 'canEdit', value)
-                              }
-                            />
-                          </td>
-                          <td className="p-2 text-center">
-                            <Switch
-                              checked={getPermissionState(module, 'canDelete')}
-                              onCheckedChange={(value) => 
-                                handlePermissionChange(module, 'canDelete', value)
-                              }
-                            />
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </TabsContent>
-              
-              <TabsContent value="list" className="space-y-6">
-                {modules.map((module) => (
-                  <div key={module} className="mb-6">
-                    <h3 className="text-lg font-medium mb-3">{formatModule(module)}</h3>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                      <div className="flex items-center space-x-2">
-                        <Switch
-                          id={`${module}-view`}
-                          checked={getPermissionState(module, 'canView')}
-                          onCheckedChange={(value) => 
-                            handlePermissionChange(module, 'canView', value)
-                          }
-                        />
-                        <Label htmlFor={`${module}-view`}>View</Label>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <Switch
-                          id={`${module}-create`}
-                          checked={getPermissionState(module, 'canCreate')}
-                          onCheckedChange={(value) => 
-                            handlePermissionChange(module, 'canCreate', value)
-                          }
-                        />
-                        <Label htmlFor={`${module}-create`}>Create</Label>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <Switch
-                          id={`${module}-edit`}
-                          checked={getPermissionState(module, 'canEdit')}
-                          onCheckedChange={(value) => 
-                            handlePermissionChange(module, 'canEdit', value)
-                          }
-                        />
-                        <Label htmlFor={`${module}-edit`}>Edit</Label>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <Switch
-                          id={`${module}-delete`}
-                          checked={getPermissionState(module, 'canDelete')}
-                          onCheckedChange={(value) => 
-                            handlePermissionChange(module, 'canDelete', value)
-                          }
-                        />
-                        <Label htmlFor={`${module}-delete`}>Delete</Label>
-                      </div>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </TabsContent>
+            
+            <TabsContent value="list" className="space-y-6">
+              {modules.map((module) => (
+                <div key={module} className="mb-6">
+                  <h3 className="text-lg font-medium mb-3">{formatModule(module)}</h3>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div className="flex items-center space-x-2">
+                      <Switch
+                        id={`${module}-view`}
+                        checked={getPermissionState(module, 'canView')}
+                        onCheckedChange={(value) => 
+                          handlePermissionChange(module, 'canView', value)
+                        }
+                      />
+                      <Label htmlFor={`${module}-view`}>View</Label>
                     </div>
-                    <Separator className="mt-4" />
+                    <div className="flex items-center space-x-2">
+                      <Switch
+                        id={`${module}-create`}
+                        checked={getPermissionState(module, 'canCreate')}
+                        onCheckedChange={(value) => 
+                          handlePermissionChange(module, 'canCreate', value)
+                        }
+                      />
+                      <Label htmlFor={`${module}-create`}>Create</Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Switch
+                        id={`${module}-edit`}
+                        checked={getPermissionState(module, 'canEdit')}
+                        onCheckedChange={(value) => 
+                          handlePermissionChange(module, 'canEdit', value)
+                        }
+                      />
+                      <Label htmlFor={`${module}-edit`}>Edit</Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Switch
+                        id={`${module}-delete`}
+                        checked={getPermissionState(module, 'canDelete')}
+                        onCheckedChange={(value) => 
+                          handlePermissionChange(module, 'canDelete', value)
+                        }
+                      />
+                      <Label htmlFor={`${module}-delete`}>Delete</Label>
+                    </div>
                   </div>
-                ))}
-              </TabsContent>
-            </Tabs>
+                  <Separator className="mt-4" />
+                </div>
+              ))}
+            </TabsContent>
+          </Tabs>
+        )}
+      </CardContent>
+      
+      <CardFooter className="flex justify-between">
+        <div className="text-sm text-muted-foreground">
+          {updatePermission.isPending || createPermission.isPending ? (
+            <span className="flex items-center">
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              Saving changes...
+            </span>
+          ) : (
+            <span>Last updated: {new Date().toLocaleString()}</span>
           )}
-        </CardContent>
-        
-        <CardFooter className="flex justify-between">
-          <div className="text-sm text-muted-foreground">
-            {updatePermission.isPending || createPermission.isPending ? (
-              <span className="flex items-center">
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Saving changes...
-              </span>
-            ) : (
-              <span>Last updated: {new Date().toLocaleString()}</span>
-            )}
-          </div>
-        </CardFooter>
-      </Card>
-    </div>
+        </div>
+      </CardFooter>
+    </Card>
   );
 }

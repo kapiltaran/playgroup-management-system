@@ -11,6 +11,8 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import RoleManagement from "@/pages/role-management";
 
 interface CurrencySettings {
   value: string;
@@ -47,7 +49,10 @@ function CurrencySettings() {
   // Query to fetch the current currency setting
   const { data: currencySetting, isLoading: isLoadingCurrency } = useQuery<CurrencySettings>({
     queryKey: ["/api/settings/currency"],
-    queryFn: () => apiRequest<CurrencySettings>("GET", "/api/settings/currency", undefined),
+    queryFn: () => apiRequest<CurrencySettings>({
+      url: "/api/settings/currency",
+      method: "GET"
+    }),
   });
 
   const form = useForm<z.infer<typeof currencyFormSchema>>({
@@ -69,10 +74,14 @@ function CurrencySettings() {
   // Mutation to update the currency setting
   const updateCurrencyMutation = useMutation({
     mutationFn: (data: z.infer<typeof currencyFormSchema>) => {
-      return apiRequest("POST", "/api/settings", {
-        key: "currency",
-        value: data.value,
-        description: "Default currency for fees and expenses"
+      return apiRequest({
+        url: "/api/settings",
+        method: "POST",
+        data: {
+          key: "currency",
+          value: data.value,
+          description: "Default currency for fees and expenses"
+        }
       });
     },
     onSuccess: () => {
@@ -189,7 +198,7 @@ function CurrencySettings() {
 
 export default function SettingsPage() {
   return (
-    <div className="p-6 max-w-5xl mx-auto space-y-6">
+    <div className="p-6 max-w-7xl mx-auto space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Settings</h1>
@@ -199,10 +208,23 @@ export default function SettingsPage() {
         </div>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-2">
-        <CurrencySettings />
-        {/* Add more settings cards here as needed */}
-      </div>
+      <Tabs defaultValue="general" className="w-full">
+        <TabsList className="mb-4">
+          <TabsTrigger value="general">General Settings</TabsTrigger>
+          <TabsTrigger value="roles">Role Management</TabsTrigger>
+        </TabsList>
+        
+        <TabsContent value="general">
+          <div className="grid gap-6 md:grid-cols-2">
+            <CurrencySettings />
+            {/* Add more settings cards here as needed */}
+          </div>
+        </TabsContent>
+        
+        <TabsContent value="roles">
+          <RoleManagement />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
