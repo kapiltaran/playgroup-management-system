@@ -156,22 +156,15 @@ export function StudentForm({
           setCreatingAccount(true);
           
           try {
-            const url = `/api/students/${studentId}/create-account`;
-            console.log("Making parent account creation API request to:", url);
+            console.log("Making parent account creation API request for student ID:", studentId);
             
-            const response = await fetch(url, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              credentials: 'include'
-            });
-            
-            if (!response.ok) {
-              const errorText = await response.text();
-              console.error(`Error creating parent account (${response.status}):`, errorText);
-              throw new Error(`Failed to create parent account: ${errorText}`);
-            }
-            
-            const responseData = await response.json();
+            // Use apiRequest helper instead of fetch to ensure consistent URL formatting
+            // apiRequest directly returns the JSON response data, not a Response object
+            const responseData = await apiRequest(
+              "POST", 
+              `/api/students/${studentId}/create-account`, 
+              null
+            );
             console.log("Account creation response:", responseData);
             
             // Invalidate the users cache to refresh the user management page
