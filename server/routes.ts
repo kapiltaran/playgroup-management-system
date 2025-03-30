@@ -5,7 +5,12 @@ import {
   insertStudentSchema, 
   insertExpenseSchema, 
   insertInventorySchema,
-  insertActivitySchema
+  insertActivitySchema,
+  insertClassSchema,
+  insertFeeStructureSchema,
+  insertFeeInstallmentSchema,
+  insertFeePaymentSchema,
+  insertReminderSchema
 } from "@shared/schema";
 import { ZodError } from "zod";
 
@@ -331,6 +336,484 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error exporting inventory:", error);
       res.status(500).json({ message: "Failed to export inventory" });
+    }
+  });
+
+  // Fee Management API Routes
+  
+  // Classes API
+  app.get("/api/classes", async (req: Request, res: Response) => {
+    try {
+      const classes = await storage.getClasses();
+      res.json(classes);
+    } catch (error) {
+      console.error("Error fetching classes:", error);
+      res.status(500).json({ message: "Failed to fetch classes" });
+    }
+  });
+  
+  app.get("/api/classes/:id", async (req: Request, res: Response) => {
+    try {
+      const classId = parseInt(req.params.id);
+      if (isNaN(classId)) {
+        return res.status(400).json({ message: "Invalid class ID" });
+      }
+      
+      const classItem = await storage.getClass(classId);
+      if (!classItem) {
+        return res.status(404).json({ message: "Class not found" });
+      }
+      
+      res.json(classItem);
+    } catch (error) {
+      console.error("Error fetching class:", error);
+      res.status(500).json({ message: "Failed to fetch class" });
+    }
+  });
+  
+  app.post("/api/classes", async (req: Request, res: Response) => {
+    try {
+      const insertData = insertClassSchema.parse(req.body);
+      const classItem = await storage.createClass(insertData);
+      res.status(201).json(classItem);
+    } catch (error) {
+      handleZodError(error, res);
+    }
+  });
+  
+  app.patch("/api/classes/:id", async (req: Request, res: Response) => {
+    try {
+      const classId = parseInt(req.params.id);
+      if (isNaN(classId)) {
+        return res.status(400).json({ message: "Invalid class ID" });
+      }
+      
+      const updateData = insertClassSchema.partial().parse(req.body);
+      const updatedClass = await storage.updateClass(classId, updateData);
+      
+      if (!updatedClass) {
+        return res.status(404).json({ message: "Class not found" });
+      }
+      
+      res.json(updatedClass);
+    } catch (error) {
+      handleZodError(error, res);
+    }
+  });
+  
+  app.delete("/api/classes/:id", async (req: Request, res: Response) => {
+    try {
+      const classId = parseInt(req.params.id);
+      if (isNaN(classId)) {
+        return res.status(400).json({ message: "Invalid class ID" });
+      }
+      
+      const success = await storage.deleteClass(classId);
+      
+      if (!success) {
+        return res.status(400).json({ 
+          message: "Cannot delete class. It may have students assigned or fee structures associated with it." 
+        });
+      }
+      
+      res.status(204).end();
+    } catch (error) {
+      console.error("Error deleting class:", error);
+      res.status(500).json({ message: "Failed to delete class" });
+    }
+  });
+  
+  // Fee Structures API
+  app.get("/api/fee-structures", async (req: Request, res: Response) => {
+    try {
+      const classId = req.query.classId ? parseInt(req.query.classId as string) : undefined;
+      
+      let feeStructures;
+      if (classId && !isNaN(classId)) {
+        feeStructures = await storage.getFeeStructuresByClass(classId);
+      } else {
+        feeStructures = await storage.getFeeStructures();
+      }
+      
+      res.json(feeStructures);
+    } catch (error) {
+      console.error("Error fetching fee structures:", error);
+      res.status(500).json({ message: "Failed to fetch fee structures" });
+    }
+  });
+  
+  app.get("/api/fee-structures/:id", async (req: Request, res: Response) => {
+    try {
+      const feeStructureId = parseInt(req.params.id);
+      if (isNaN(feeStructureId)) {
+        return res.status(400).json({ message: "Invalid fee structure ID" });
+      }
+      
+      const feeStructure = await storage.getFeeStructure(feeStructureId);
+      if (!feeStructure) {
+        return res.status(404).json({ message: "Fee structure not found" });
+      }
+      
+      res.json(feeStructure);
+    } catch (error) {
+      console.error("Error fetching fee structure:", error);
+      res.status(500).json({ message: "Failed to fetch fee structure" });
+    }
+  });
+  
+  app.post("/api/fee-structures", async (req: Request, res: Response) => {
+    try {
+      const insertData = insertFeeStructureSchema.parse(req.body);
+      const feeStructure = await storage.createFeeStructure(insertData);
+      res.status(201).json(feeStructure);
+    } catch (error) {
+      handleZodError(error, res);
+    }
+  });
+  
+  app.patch("/api/fee-structures/:id", async (req: Request, res: Response) => {
+    try {
+      const feeStructureId = parseInt(req.params.id);
+      if (isNaN(feeStructureId)) {
+        return res.status(400).json({ message: "Invalid fee structure ID" });
+      }
+      
+      const updateData = insertFeeStructureSchema.partial().parse(req.body);
+      const updatedFeeStructure = await storage.updateFeeStructure(feeStructureId, updateData);
+      
+      if (!updatedFeeStructure) {
+        return res.status(404).json({ message: "Fee structure not found" });
+      }
+      
+      res.json(updatedFeeStructure);
+    } catch (error) {
+      handleZodError(error, res);
+    }
+  });
+  
+  app.delete("/api/fee-structures/:id", async (req: Request, res: Response) => {
+    try {
+      const feeStructureId = parseInt(req.params.id);
+      if (isNaN(feeStructureId)) {
+        return res.status(400).json({ message: "Invalid fee structure ID" });
+      }
+      
+      const success = await storage.deleteFeeStructure(feeStructureId);
+      
+      if (!success) {
+        return res.status(400).json({ 
+          message: "Cannot delete fee structure. It may be in use by students or have installments associated with it." 
+        });
+      }
+      
+      res.status(204).end();
+    } catch (error) {
+      console.error("Error deleting fee structure:", error);
+      res.status(500).json({ message: "Failed to delete fee structure" });
+    }
+  });
+  
+  // Fee Installments API
+  app.get("/api/fee-installments", async (req: Request, res: Response) => {
+    try {
+      const feeStructureId = req.query.feeStructureId ? parseInt(req.query.feeStructureId as string) : undefined;
+      const installments = await storage.getFeeInstallments(feeStructureId);
+      res.json(installments);
+    } catch (error) {
+      console.error("Error fetching fee installments:", error);
+      res.status(500).json({ message: "Failed to fetch fee installments" });
+    }
+  });
+  
+  app.get("/api/fee-installments/:id", async (req: Request, res: Response) => {
+    try {
+      const installmentId = parseInt(req.params.id);
+      if (isNaN(installmentId)) {
+        return res.status(400).json({ message: "Invalid installment ID" });
+      }
+      
+      const installment = await storage.getFeeInstallment(installmentId);
+      if (!installment) {
+        return res.status(404).json({ message: "Fee installment not found" });
+      }
+      
+      res.json(installment);
+    } catch (error) {
+      console.error("Error fetching fee installment:", error);
+      res.status(500).json({ message: "Failed to fetch fee installment" });
+    }
+  });
+  
+  app.post("/api/fee-installments", async (req: Request, res: Response) => {
+    try {
+      const insertData = insertFeeInstallmentSchema.parse(req.body);
+      const installment = await storage.createFeeInstallment(insertData);
+      res.status(201).json(installment);
+    } catch (error) {
+      handleZodError(error, res);
+    }
+  });
+  
+  app.patch("/api/fee-installments/:id", async (req: Request, res: Response) => {
+    try {
+      const installmentId = parseInt(req.params.id);
+      if (isNaN(installmentId)) {
+        return res.status(400).json({ message: "Invalid installment ID" });
+      }
+      
+      const updateData = insertFeeInstallmentSchema.partial().parse(req.body);
+      const updatedInstallment = await storage.updateFeeInstallment(installmentId, updateData);
+      
+      if (!updatedInstallment) {
+        return res.status(404).json({ message: "Fee installment not found" });
+      }
+      
+      res.json(updatedInstallment);
+    } catch (error) {
+      handleZodError(error, res);
+    }
+  });
+  
+  app.delete("/api/fee-installments/:id", async (req: Request, res: Response) => {
+    try {
+      const installmentId = parseInt(req.params.id);
+      if (isNaN(installmentId)) {
+        return res.status(400).json({ message: "Invalid installment ID" });
+      }
+      
+      const success = await storage.deleteFeeInstallment(installmentId);
+      
+      if (!success) {
+        return res.status(400).json({ 
+          message: "Cannot delete installment. It may have payments or reminders associated with it." 
+        });
+      }
+      
+      res.status(204).end();
+    } catch (error) {
+      console.error("Error deleting fee installment:", error);
+      res.status(500).json({ message: "Failed to delete fee installment" });
+    }
+  });
+  
+  // Fee Payments API
+  app.get("/api/fee-payments", async (req: Request, res: Response) => {
+    try {
+      const studentId = req.query.studentId ? parseInt(req.query.studentId as string) : undefined;
+      const installmentId = req.query.installmentId ? parseInt(req.query.installmentId as string) : undefined;
+      
+      const payments = await storage.getFeePayments(studentId, installmentId);
+      res.json(payments);
+    } catch (error) {
+      console.error("Error fetching fee payments:", error);
+      res.status(500).json({ message: "Failed to fetch fee payments" });
+    }
+  });
+  
+  app.get("/api/fee-payments/:id", async (req: Request, res: Response) => {
+    try {
+      const paymentId = parseInt(req.params.id);
+      if (isNaN(paymentId)) {
+        return res.status(400).json({ message: "Invalid payment ID" });
+      }
+      
+      const payment = await storage.getFeePayment(paymentId);
+      if (!payment) {
+        return res.status(404).json({ message: "Fee payment not found" });
+      }
+      
+      res.json(payment);
+    } catch (error) {
+      console.error("Error fetching fee payment:", error);
+      res.status(500).json({ message: "Failed to fetch fee payment" });
+    }
+  });
+  
+  app.post("/api/fee-payments", async (req: Request, res: Response) => {
+    try {
+      const insertData = insertFeePaymentSchema.parse(req.body);
+      const payment = await storage.createFeePayment(insertData);
+      res.status(201).json(payment);
+    } catch (error) {
+      handleZodError(error, res);
+    }
+  });
+  
+  app.patch("/api/fee-payments/:id", async (req: Request, res: Response) => {
+    try {
+      const paymentId = parseInt(req.params.id);
+      if (isNaN(paymentId)) {
+        return res.status(400).json({ message: "Invalid payment ID" });
+      }
+      
+      const updateData = insertFeePaymentSchema.partial().parse(req.body);
+      const updatedPayment = await storage.updateFeePayment(paymentId, updateData);
+      
+      if (!updatedPayment) {
+        return res.status(404).json({ message: "Fee payment not found" });
+      }
+      
+      res.json(updatedPayment);
+    } catch (error) {
+      handleZodError(error, res);
+    }
+  });
+  
+  app.delete("/api/fee-payments/:id", async (req: Request, res: Response) => {
+    try {
+      const paymentId = parseInt(req.params.id);
+      if (isNaN(paymentId)) {
+        return res.status(400).json({ message: "Invalid payment ID" });
+      }
+      
+      const success = await storage.deleteFeePayment(paymentId);
+      
+      if (!success) {
+        return res.status(404).json({ message: "Fee payment not found" });
+      }
+      
+      res.status(204).end();
+    } catch (error) {
+      console.error("Error deleting fee payment:", error);
+      res.status(500).json({ message: "Failed to delete fee payment" });
+    }
+  });
+  
+  // Reminders API
+  app.get("/api/reminders", async (req: Request, res: Response) => {
+    try {
+      const studentId = req.query.studentId ? parseInt(req.query.studentId as string) : undefined;
+      const reminders = await storage.getReminders(studentId);
+      res.json(reminders);
+    } catch (error) {
+      console.error("Error fetching reminders:", error);
+      res.status(500).json({ message: "Failed to fetch reminders" });
+    }
+  });
+  
+  app.get("/api/reminders/:id", async (req: Request, res: Response) => {
+    try {
+      const reminderId = parseInt(req.params.id);
+      if (isNaN(reminderId)) {
+        return res.status(400).json({ message: "Invalid reminder ID" });
+      }
+      
+      const reminder = await storage.getReminder(reminderId);
+      if (!reminder) {
+        return res.status(404).json({ message: "Reminder not found" });
+      }
+      
+      res.json(reminder);
+    } catch (error) {
+      console.error("Error fetching reminder:", error);
+      res.status(500).json({ message: "Failed to fetch reminder" });
+    }
+  });
+  
+  app.post("/api/reminders", async (req: Request, res: Response) => {
+    try {
+      const insertData = insertReminderSchema.parse(req.body);
+      const reminder = await storage.createReminder(insertData);
+      res.status(201).json(reminder);
+    } catch (error) {
+      handleZodError(error, res);
+    }
+  });
+  
+  app.patch("/api/reminders/:id", async (req: Request, res: Response) => {
+    try {
+      const reminderId = parseInt(req.params.id);
+      if (isNaN(reminderId)) {
+        return res.status(400).json({ message: "Invalid reminder ID" });
+      }
+      
+      const updateData = insertReminderSchema.partial().parse(req.body);
+      const updatedReminder = await storage.updateReminder(reminderId, updateData);
+      
+      if (!updatedReminder) {
+        return res.status(404).json({ message: "Reminder not found" });
+      }
+      
+      res.json(updatedReminder);
+    } catch (error) {
+      handleZodError(error, res);
+    }
+  });
+  
+  app.delete("/api/reminders/:id", async (req: Request, res: Response) => {
+    try {
+      const reminderId = parseInt(req.params.id);
+      if (isNaN(reminderId)) {
+        return res.status(400).json({ message: "Invalid reminder ID" });
+      }
+      
+      const success = await storage.deleteReminder(reminderId);
+      
+      if (!success) {
+        return res.status(404).json({ message: "Reminder not found" });
+      }
+      
+      res.status(204).end();
+    } catch (error) {
+      console.error("Error deleting reminder:", error);
+      res.status(500).json({ message: "Failed to delete reminder" });
+    }
+  });
+  
+  // Fee Reports
+  app.get("/api/fee-reports/pending", async (req: Request, res: Response) => {
+    try {
+      const classId = req.query.classId ? parseInt(req.query.classId as string) : undefined;
+      const pendingFees = await storage.getPendingFees(classId);
+      res.json(pendingFees);
+    } catch (error) {
+      console.error("Error fetching pending fees:", error);
+      res.status(500).json({ message: "Failed to fetch pending fees" });
+    }
+  });
+  
+  app.get("/api/fee-reports/daily", async (req: Request, res: Response) => {
+    try {
+      const dateStr = req.query.date as string;
+      if (!dateStr) {
+        return res.status(400).json({ message: "Date parameter is required" });
+      }
+      
+      const date = new Date(dateStr);
+      if (isNaN(date.getTime())) {
+        return res.status(400).json({ message: "Invalid date format" });
+      }
+      
+      const report = await storage.getDailyFeeCollection(date);
+      res.json(report);
+    } catch (error) {
+      console.error("Error fetching daily fee collection:", error);
+      res.status(500).json({ message: "Failed to fetch daily fee collection" });
+    }
+  });
+  
+  app.get("/api/fee-reports/monthly", async (req: Request, res: Response) => {
+    try {
+      const yearStr = req.query.year as string;
+      const monthStr = req.query.month as string;
+      
+      if (!yearStr || !monthStr) {
+        return res.status(400).json({ message: "Year and month parameters are required" });
+      }
+      
+      const year = parseInt(yearStr);
+      // Month is 0-based in JavaScript Date (0 = January, 11 = December)
+      const month = parseInt(monthStr) - 1;
+      
+      if (isNaN(year) || isNaN(month) || month < 0 || month > 11) {
+        return res.status(400).json({ message: "Invalid year or month format" });
+      }
+      
+      const report = await storage.getMonthlyFeeCollection(year, month);
+      res.json(report);
+    } catch (error) {
+      console.error("Error fetching monthly fee collection:", error);
+      res.status(500).json({ message: "Failed to fetch monthly fee collection" });
     }
   });
 
