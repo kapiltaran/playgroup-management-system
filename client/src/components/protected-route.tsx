@@ -1,6 +1,7 @@
 import { ComponentType } from "react";
 import { useAuth } from "@/context/auth-context";
 import AccessDenied from "./access-denied";
+import { Loader2 } from "lucide-react";
 
 type RoleType = "parent" | "teacher" | "officeadmin" | "superadmin";
 
@@ -19,7 +20,17 @@ export default function ProtectedRoute({
   component: Component, 
   allowedRoles 
 }: ProtectedRouteProps) {
-  const { user } = useAuth();
+  const { user, isLoading } = useAuth();
+  
+  // If auth state is still loading, show loading indicator
+  if (isLoading) {
+    return (
+      <div className="flex h-screen items-center justify-center">
+        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+        <span className="ml-2 text-lg">Loading...</span>
+      </div>
+    );
+  }
   
   // Check if user exists and has a role in allowedRoles
   const hasAccess = user && allowedRoles.includes(user.role);

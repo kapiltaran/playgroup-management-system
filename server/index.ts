@@ -1,10 +1,37 @@
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
+import session from "express-session";
+import MemoryStore from "memorystore";
 
 const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
+
+// Configure session middleware
+const MemoryStoreSession = MemoryStore(session);
+app.use(session({
+  secret: 'playgroup-session-secret',
+  resave: false,
+  saveUninitialized: false,
+  store: new MemoryStoreSession({
+    checkPeriod: 86400000 // prune expired entries every 24h
+  }),
+  cookie: { 
+    secure: false, // Set to true in production with https
+    maxAge: 24 * 60 * 60 * 1000 // 24 hours
+  }
+}));
+
+// Auth middleware to attach user from session to request
+app.use((req: Request, res: Response, next: NextFunction) => {
+  const user = (req.session as any).user;
+  if (user) {
+    (req as any).user = user;
+    // console.log(`Request authenticated as user: ${user.username} (${user.role})`);
+  }
+  next();
+});
 
 app.use((req, res, next) => {
   const start = Date.now();

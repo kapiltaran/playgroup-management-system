@@ -74,9 +74,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         studentId: user.studentId
       };
       
-      // Set up session in a real app, we'd use JWT or session middleware
+      // Store user in session
+      (req.session as any).user = {
+        id: user.id,
+        username: user.username,
+        email: user.email,
+        fullName: user.fullName,
+        role: user.role,
+        active: user.active,
+        studentId: user.studentId
+      };
       
-      console.log(`User ${username} (${user.role}) logged in successfully`);
+      console.log(`User ${username} (${user.role}) logged in successfully and saved to session`);
       
       // Return user data (excluding password hash)
       const { passwordHash, ...userData } = user;
@@ -87,6 +96,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Login error:", error);
       res.status(500).json({ message: "An error occurred during login" });
+    }
+  });
+  
+  // Logout endpoint
+  app.post("/api/auth/logout", (req: Request, res: Response) => {
+    try {
+      // Check if the user is logged in
+      const user = (req as any).user;
+      if (user) {
+        console.log(`User ${user.username} (${user.role}) logged out`);
+      }
+      
+      // Destroy the session
+      req.session.destroy((err) => {
+        if (err) {
+          console.error("Error destroying session:", err);
+          return res.status(500).json({ message: "Error logging out" });
+        }
+        
+        res.clearCookie('connect.sid'); // Clear the session cookie
+        res.json({ message: "Logout successful" });
+      });
+    } catch (error) {
+      console.error("Logout error:", error);
+      res.status(500).json({ message: "An error occurred during logout" });
+    }
+  });
+  
+  // Current user endpoint - returns current authenticated user
+  app.get("/api/auth/me", (req: Request, res: Response) => {
+    try {
+      const user = (req as any).user;
+      
+      if (!user) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+      
+      res.json({ user });
+    } catch (error) {
+      console.error("Error fetching current user:", error);
+      res.status(500).json({ message: "An error occurred" });
     }
   });
 
@@ -147,6 +197,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/students", async (req: Request, res: Response) => {
     try {
+      // Check user permission
+      const user = (req as any).user;
+      if (!user) {
+        return res.status(401).json({ message: "Authentication required" });
+      }
+      
+      // Check if user has permission to create students
+      const canCreate = await storage.checkPermission(user.role, 'students', 'create');
+      if (!canCreate) {
+        console.log(`User ${user.username} (${user.role}) denied permission to create student`);
+        return res.status(403).json({ message: "You don't have permission to create students" });
+      }
+      
       const studentData = insertStudentSchema.parse(req.body);
       const student = await storage.createStudent(studentData);
       console.log("Created student with ID:", student.id);
@@ -165,9 +228,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.patch("/api/students/:id", async (req: Request, res: Response) => {
     try {
-      const id = parseInt(req.params.id);
-      const updates = insertStudentSchema.partial().parse(req.body);
+      // Check user permission
+      const user = (req as any).user;
+      if (!user) {
+        return res.status(401).json({ message: "Authentication required" });
+      }
       
+      // Check if user has permission to edit students
+      const canEdit = await storage.checkPermission(user.role, 'students', 'edit');
+      if (!canEdit) {
+        console.log(`User ${user.username} (${user.role}) denied permission to edit student`);
+        return res.status(403).json({ message: "You don't have permission to edit students" });
+      }
+      
+      const id = parseInt(req.params.id);
+      
+      // For parents, check if they have access to this specific student
+      if (user.role === 'parent') {
+        const allowedStudents = await storage.getStudentsByParent(user.id);
+        const hasAccess = allowedStudents.some(s => s.id === id);
+        
+        if (!hasAccess) {
+          console.log(`Parent ${user.id} denied access to edit student ${id}`);
+          return res.status(403).json({ message: "You don't have permission to edit this student" });
+        }
+      }
+      
+      const updates = insertStudentSchema.partial().parse(req.body);
       const updatedStudent = await storage.updateStudent(id, updates);
       
       if (!updatedStudent) {
@@ -182,6 +269,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.delete("/api/students/:id", async (req: Request, res: Response) => {
     try {
+      // Check user permission
+      const user = (req as any).user;
+      if (!user) {
+        return res.status(401).json({ message: "Authentication required" });
+      }
+      
+      // Check if user has permission to delete students
+      const canDelete = await storage.checkPermission(user.role, 'students', 'delete');
+      if (!canDelete) {
+        console.log(`User ${user.username} (${user.role}) denied permission to delete student`);
+        return res.status(403).json({ message: "You don't have permission to delete students" });
+      }
+      
       const id = parseInt(req.params.id);
       const success = await storage.deleteStudent(id);
       
