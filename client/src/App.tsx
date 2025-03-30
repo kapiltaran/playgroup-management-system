@@ -14,36 +14,12 @@ import FeeManagement from "@/pages/fee-management";
 import FeePayments from "@/pages/fee-payments";
 import Settings from "@/pages/settings";
 import Login from "@/pages/login";
-import { useEffect, useState } from "react";
-
-// Simple authentication check
-function useAuth() {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [user, setUser] = useState<any>(null);
-  const [, setLocation] = useLocation();
-
-  useEffect(() => {
-    // Check if user data exists in session storage
-    const userData = sessionStorage.getItem("user");
-    if (userData) {
-      try {
-        const parsedUser = JSON.parse(userData);
-        setUser(parsedUser);
-        setIsAuthenticated(true);
-      } catch (err) {
-        console.error("Failed to parse user data:", err);
-        sessionStorage.removeItem("user");
-        setLocation("/login");
-      }
-    }
-  }, [setLocation]);
-
-  return { isAuthenticated, user };
-}
+import { AuthProvider, useAuth } from "@/context/auth-context";
+import ProtectedRoute from "@/components/protected-route";
 
 function AuthenticatedApp() {
   const { isAuthenticated, user } = useAuth();
-  const [location] = useLocation();
+  const [location, setLocation] = useLocation();
 
   // If on login page, don't redirect
   if (location === "/login") {
@@ -60,29 +36,98 @@ function AuthenticatedApp() {
     return <Login />;
   }
 
-  // Check if user is parent, restrict to only students page
-  if (user && user.role === "parent" && location !== "/students" && location !== "/") {
-    return (
-      <AppLayout>
-        <Students />
-      </AppLayout>
-    );
+  // Define allowed paths for each role
+  const rolePathMap = {
+    parent: ["/students"],
+    teacher: ["/dashboard", "/students", "/classes", "/inventory"],
+    officeadmin: ["/dashboard", "/students", "/classes", "/fee-management", "/fee-payments", "/expenses", "/inventory", "/reports"],
+    superadmin: ["/dashboard", "/students", "/classes", "/fee-management", "/fee-payments", "/expenses", "/inventory", "/reports", "/settings", "/role-management", "/user-management"]
+  };
+
+  // Redirect to allowed page based on role
+  if (user && location !== "/") {
+    const allowedPaths = rolePathMap[user.role] || [];
+    if (!allowedPaths.includes(location)) {
+      // Redirect to the first allowed page for this role
+      if (allowedPaths.length > 0) {
+        if (location !== allowedPaths[0]) {
+          setLocation(allowedPaths[0]);
+          return null;
+        }
+      }
+    }
+  } 
+  
+  // Handle root path redirects for each role
+  if (user && (location === "/" || location === "")) {
+    // Parents go straight to students page
+    if (user.role === "parent") {
+      setLocation("/students");
+      return null;
+    }
+    // Everyone else goes to dashboard
+    setLocation("/dashboard");
+    return null;
   }
 
-  // Regular authenticated routing
+  // Regular authenticated routing with role-based protection
   return (
     <AppLayout>
       <Switch>
-        <Route path="/" component={Dashboard} />
-        <Route path="/dashboard" component={Dashboard} />
-        <Route path="/students" component={Students} />
-        <Route path="/classes" component={Classes} />
-        <Route path="/fee-management" component={FeeManagement} />
-        <Route path="/fee-payments" component={FeePayments} />
-        <Route path="/expenses" component={Expenses} />
-        <Route path="/inventory" component={Inventory} />
-        <Route path="/reports" component={Reports} />
-        <Route path="/settings" component={Settings} />
+        <Route path="/dashboard">
+          <ProtectedRoute 
+            component={Dashboard} 
+            allowedRoles={["teacher", "officeadmin", "superadmin"]} 
+          />
+        </Route>
+        <Route path="/students">
+          <ProtectedRoute 
+            component={Students} 
+            allowedRoles={["parent", "teacher", "officeadmin", "superadmin"]} 
+          />
+        </Route>
+        <Route path="/classes">
+          <ProtectedRoute 
+            component={Classes} 
+            allowedRoles={["teacher", "officeadmin", "superadmin"]} 
+          />
+        </Route>
+        <Route path="/fee-management">
+          <ProtectedRoute 
+            component={FeeManagement} 
+            allowedRoles={["officeadmin", "superadmin"]} 
+          />
+        </Route>
+        <Route path="/fee-payments">
+          <ProtectedRoute 
+            component={FeePayments} 
+            allowedRoles={["officeadmin", "superadmin"]} 
+          />
+        </Route>
+        <Route path="/expenses">
+          <ProtectedRoute 
+            component={Expenses} 
+            allowedRoles={["officeadmin", "superadmin"]} 
+          />
+        </Route>
+        <Route path="/inventory">
+          <ProtectedRoute 
+            component={Inventory} 
+            allowedRoles={["teacher", "officeadmin", "superadmin"]} 
+          />
+        </Route>
+        <Route path="/reports">
+          <ProtectedRoute 
+            component={Reports} 
+            allowedRoles={["officeadmin", "superadmin"]} 
+          />
+        </Route>
+        <Route path="/settings">
+          <ProtectedRoute 
+            component={Settings} 
+            allowedRoles={["superadmin"]} 
+          />
+        </Route>
         <Route component={NotFound} />
       </Switch>
     </AppLayout>
@@ -92,8 +137,10 @@ function AuthenticatedApp() {
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <AuthenticatedApp />
-      <Toaster />
+      <AuthProvider>
+        <AuthenticatedApp />
+        <Toaster />
+      </AuthProvider>
     </QueryClientProvider>
   );
 }

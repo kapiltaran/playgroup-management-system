@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { AlertCircle, Loader2 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { useAuth } from "@/context/auth-context";
 
 // Login form schema with validation
 const loginSchema = z.object({
@@ -24,6 +25,7 @@ export default function LoginPage() {
   const [, setLocation] = useLocation();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
+  const { login } = useAuth();
 
   // Initialize form with validation
   const form = useForm<LoginFormValues>({
@@ -58,8 +60,8 @@ export default function LoginPage() {
         description: "Welcome back!",
       });
 
-      // Store user info in session storage
-      sessionStorage.setItem("user", JSON.stringify(data.user));
+      // Use auth context login function
+      login(data.user);
 
       // Redirect based on user role
       if (data.user.role === "parent") {
@@ -135,8 +137,33 @@ export default function LoginPage() {
             </form>
           </Form>
         </CardContent>
-        <CardFooter className="text-center text-sm">
-          <p className="text-muted-foreground w-full">
+        <CardFooter className="flex flex-col gap-2 text-center text-sm">
+          <div className="w-full border-t pt-2">
+            <p className="text-muted-foreground mb-2">Sample Accounts:</p>
+            <div className="grid grid-cols-2 gap-2 text-xs">
+              <div className="border rounded-md p-1">
+                <p className="font-medium">Admin</p>
+                <p>Username: admin</p>
+                <p>Password: password123</p>
+              </div>
+              <div className="border rounded-md p-1">
+                <p className="font-medium">Teacher</p>
+                <p>Username: teacher</p>
+                <p>Password: password123</p>
+              </div>
+              <div className="border rounded-md p-1">
+                <p className="font-medium">Office Admin</p>
+                <p>Username: office</p>
+                <p>Password: password123</p>
+              </div>
+              <div className="border rounded-md p-1">
+                <p className="font-medium">Parent</p>
+                <p>Username: parent</p>
+                <p>Password: password123</p>
+              </div>
+            </div>
+          </div>
+          <p className="text-muted-foreground w-full mt-2">
             Playgroup Management System
           </p>
         </CardFooter>

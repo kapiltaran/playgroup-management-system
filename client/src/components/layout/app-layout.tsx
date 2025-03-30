@@ -10,12 +10,22 @@ import {
   PackageIcon, 
   BarChart3Icon, 
   MoreHorizontalIcon, 
-  MenuIcon 
+  MenuIcon,
+  LogOutIcon 
 } from "lucide-react";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { useAuth } from "@/context/auth-context";
+import { 
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger 
+} from "@/components/ui/dropdown-menu";
 
 interface AppLayoutProps {
   children: React.ReactNode;
@@ -23,34 +33,51 @@ interface AppLayoutProps {
 
 export default function AppLayout({ children }: AppLayoutProps) {
   const [open, setOpen] = useState(false);
+  const { user, logout } = useAuth();
 
-  const navItems = [
-    {
-      href: "/dashboard",
-      label: "Dashboard",
-      icon: <LayoutDashboardIcon className="h-5 w-5" />
-    },
+  // Base nav items all users can access
+  const baseNavItems = [
     {
       href: "/students",
       label: "Students",
-      icon: <UsersIcon className="h-5 w-5" />
+      icon: <UsersIcon className="h-5 w-5" />,
+      roles: ["parent", "teacher", "officeadmin", "superadmin"]
+    }
+  ];
+  
+  // Role-restricted nav items
+  const roleNavItems = [
+    {
+      href: "/dashboard",
+      label: "Dashboard",
+      icon: <LayoutDashboardIcon className="h-5 w-5" />,
+      roles: ["teacher", "officeadmin", "superadmin"]
     },
     {
       href: "/expenses",
       label: "Expenses",
-      icon: <DollarSignIcon className="h-5 w-5" />
+      icon: <DollarSignIcon className="h-5 w-5" />,
+      roles: ["officeadmin", "superadmin"]
     },
     {
       href: "/inventory",
       label: "Inventory",
-      icon: <PackageIcon className="h-5 w-5" />
+      icon: <PackageIcon className="h-5 w-5" />,
+      roles: ["teacher", "officeadmin", "superadmin"]
     },
     {
       href: "/reports",
       label: "More",
-      icon: <MoreHorizontalIcon className="h-5 w-5" />
+      icon: <MoreHorizontalIcon className="h-5 w-5" />,
+      roles: ["officeadmin", "superadmin"]
     }
   ];
+  
+  // Filter nav items based on user role
+  const navItems = user ? [
+    ...baseNavItems,
+    ...roleNavItems.filter(item => item.roles.includes(user.role))
+  ] : [];
 
   return (
     <div className="h-screen flex flex-col">
@@ -84,15 +111,41 @@ export default function AppLayout({ children }: AppLayoutProps) {
                 </Badge>
               </Button>
             </div>
-            <div className="ml-2 flex items-center">
-              <Avatar>
-                <AvatarImage src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=100&q=80" />
-                <AvatarFallback>SC</AvatarFallback>
-              </Avatar>
-              <span className="ml-2 text-sm font-medium text-gray-700 hidden md:block">
-                Sarah Connor
-              </span>
-            </div>
+            {user && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <div className="ml-2 flex items-center cursor-pointer">
+                    <Avatar>
+                      <AvatarFallback>{user.fullName.split(' ').map(n => n[0]).join('')}</AvatarFallback>
+                    </Avatar>
+                    <span className="ml-2 text-sm font-medium text-gray-700 hidden md:block">
+                      {user.fullName}
+                    </span>
+                  </div>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56">
+                  <DropdownMenuLabel>
+                    <div className="flex flex-col space-y-1">
+                      <p className="text-sm font-medium">{user.fullName}</p>
+                      <p className="text-xs text-muted-foreground">{user.email}</p>
+                    </div>
+                  </DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuLabel>
+                    <span className="text-xs font-medium bg-primary/10 text-primary px-2 py-1 rounded-full capitalize">
+                      {user.role}
+                    </span>
+                  </DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem 
+                    className="text-destructive focus:text-destructive cursor-pointer"
+                    onClick={() => logout()}>
+                    <LogOutIcon className="mr-2 h-4 w-4" />
+                    <span>Sign out</span>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
           </div>
         </div>
       </header>

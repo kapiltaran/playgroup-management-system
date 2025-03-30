@@ -21,6 +21,8 @@ import { DataTable } from "@/components/ui/data-table";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { apiRequest } from "@/lib/queryClient";
+import { usePermission } from "@/hooks/use-permission";
+import PermissionGate from "@/components/permission-gate";
 import type { Activity, Student, Expense, User } from "@shared/schema";
 
 export default function Dashboard() {
@@ -169,13 +171,17 @@ export default function Dashboard() {
     return fullName.substring(0, 2).toUpperCase();
   };
 
+  const { hasRole } = usePermission();
+
   return (
     <div className="max-w-7xl mx-auto">
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
-        <Button onClick={() => setIsStudentFormOpen(true)}>
-          <UsersIcon className="mr-2 h-4 w-4" /> Add New Student
-        </Button>
+        <PermissionGate allowedRoles={["teacher", "officeadmin", "superadmin"]}>
+          <Button onClick={() => setIsStudentFormOpen(true)}>
+            <UsersIcon className="mr-2 h-4 w-4" /> Add New Student
+          </Button>
+        </PermissionGate>
       </div>
 
       {/* Stats cards */}
@@ -226,11 +232,20 @@ export default function Dashboard() {
 
       {/* Charts and recent activity */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
-        <ExpenseChart 
-          data={expenseChartData}
-          isLoading={isLoadingExpenseReport}
-          className="lg:col-span-2"
-        />
+        <PermissionGate 
+          allowedRoles={["officeadmin", "superadmin"]}
+          fallback={<Card className="lg:col-span-2 flex items-center justify-center p-8">
+            <div className="text-center">
+              <p className="text-gray-500">Expense chart is only visible to Office Admin and Super Admin users</p>
+            </div>
+          </Card>}
+        >
+          <ExpenseChart 
+            data={expenseChartData}
+            isLoading={isLoadingExpenseReport}
+            className="lg:col-span-2"
+          />
+        </PermissionGate>
 
         <Card>
           <CardHeader className="pb-2">
@@ -384,41 +399,52 @@ export default function Dashboard() {
           </CardContent>
         </Card>
 
-        <Card className="lg:col-span-1">
-          <CardHeader className="flex flex-row items-center justify-between py-4">
-            <CardTitle className="text-lg font-semibold">Recent Expenses</CardTitle>
-            <Link href="/expenses">
-              <a className="text-sm text-primary font-medium">View all</a>
-            </Link>
-          </CardHeader>
-          <CardContent className="p-0">
-            <DataTable
-              data={expenses || []}
-              isLoading={isLoadingExpenses}
-              columns={[
-                {
-                  accessorKey: "description",
-                  header: "Description",
-                  cell: (expense) => (
-                    <div className="text-sm font-medium text-gray-900">{expense.description}</div>
-                  )
-                },
-                {
-                  accessorKey: "category",
-                  header: "Category",
-                  cell: (expense) => renderCategoryBadge(expense.category)
-                },
-                {
-                  accessorKey: "amount",
-                  header: "Amount",
-                  cell: (expense) => (
-                    <div className="text-sm text-gray-900">${parseFloat(expense.amount as string).toFixed(2)}</div>
-                  )
-                }
-              ]}
-            />
-          </CardContent>
-        </Card>
+        <PermissionGate 
+          allowedRoles={["officeadmin", "superadmin"]}
+          fallback={
+            <Card className="lg:col-span-1 flex items-center justify-center p-8">
+              <div className="text-center">
+                <p className="text-gray-500">Expense data is only visible to Office Admin and Super Admin users</p>
+              </div>
+            </Card>
+          }
+        >
+          <Card className="lg:col-span-1">
+            <CardHeader className="flex flex-row items-center justify-between py-4">
+              <CardTitle className="text-lg font-semibold">Recent Expenses</CardTitle>
+              <Link href="/expenses">
+                <a className="text-sm text-primary font-medium">View all</a>
+              </Link>
+            </CardHeader>
+            <CardContent className="p-0">
+              <DataTable
+                data={expenses || []}
+                isLoading={isLoadingExpenses}
+                columns={[
+                  {
+                    accessorKey: "description",
+                    header: "Description",
+                    cell: (expense) => (
+                      <div className="text-sm font-medium text-gray-900">{expense.description}</div>
+                    )
+                  },
+                  {
+                    accessorKey: "category",
+                    header: "Category",
+                    cell: (expense) => renderCategoryBadge(expense.category)
+                  },
+                  {
+                    accessorKey: "amount",
+                    header: "Amount",
+                    cell: (expense) => (
+                      <div className="text-sm text-gray-900">${parseFloat(expense.amount as string).toFixed(2)}</div>
+                    )
+                  }
+                ]}
+              />
+            </CardContent>
+          </Card>
+        </PermissionGate>
       </div>
 
       {/* Student Form Modal */}

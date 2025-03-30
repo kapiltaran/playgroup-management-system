@@ -1295,10 +1295,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "User not found" });
       }
       
-      // Remove sensitive data
-      const { passwordHash, ...safeUser } = user;
-      
-      res.json(safeUser);
+      // Only remove sensitive data if showPassword query param is not set to true
+      if (req.query.showPassword === 'true') {
+        res.json(user);
+      } else {
+        // Remove sensitive data
+        const { passwordHash, ...safeUser } = user;
+        res.json(safeUser);
+      }
     } catch (error) {
       console.error("Error fetching user:", error);
       res.status(500).json({ message: "Failed to fetch user" });
