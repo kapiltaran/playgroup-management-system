@@ -224,11 +224,11 @@ export default function Students() {
               header: "Status",
               cell: (student) => renderStatusBadge(student.status)
             },
-            {
-              accessorKey: "id",
-              header: "Actions",
-              cell: (student) => (
-                !isParent ? (
+            ...(isParent ? [] : [
+              {
+                accessorKey: "id",
+                header: "Actions",
+                cell: (student) => (
                   <div className="flex space-x-2">
                     <Button variant="outline" size="sm" onClick={() => handleEditStudent(student)}>
                       <PencilIcon className="h-4 w-4" />
@@ -237,11 +237,9 @@ export default function Students() {
                       <Trash2Icon className="h-4 w-4" />
                     </Button>
                   </div>
-                ) : (
-                  <div className="text-sm text-gray-500">No actions available</div>
                 )
-              )
-            }
+              }
+            ])
           ]}
         />
       </div>
