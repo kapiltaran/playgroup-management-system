@@ -64,6 +64,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const studentData = insertStudentSchema.parse(req.body);
       const student = await storage.createStudent(studentData);
       console.log("Created student with ID:", student.id);
+      
+      // Make sure we return the complete student object with ID
+      if (!student || !student.id) {
+        throw new Error("Student was created but no valid student object was returned");
+      }
+      
       res.status(201).json(student);
     } catch (error) {
       console.error("Error creating student:", error);
@@ -1316,7 +1322,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       console.log("Creating account for student ID:", studentId);
       
-      // Get the student
+      // Get the student from database
+      // This line is critical - we need to ensure we're getting a valid student
       const student = await storage.getStudent(studentId);
       if (!student) {
         console.error("Student not found with ID:", studentId);

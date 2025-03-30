@@ -111,66 +111,124 @@ export function StudentForm({
         delete (studentData as any).createAccount;
       }
       
-      // Call the regular onSubmit provided by parent component
-      console.log("Submitting student data:", studentData);
-      let result;
-      try {
-        result = await onSubmit(studentData);
-        console.log("Student created successfully:", result);
-      } catch (error) {
-        console.error("Error in onSubmit:", error);
-        throw error;
-      }
+      let studentId: number;
       
-      // If createAccount is selected and we're adding a new student (not editing)
-      // If result has an ID, use it for account creation
-      if (createAccount && !isEditing && result?.id) {
-        console.log("Attempting to create parent account for student ID:", result.id);
-        setCreatingAccount(true);
-        
-        // Create an account for the parent
+      // We'll use direct API calls instead of relying on the mutation to ensure we get proper data back
+      if (isEditing && defaultValues?.id) {
+        // Handle editing existing student
+        console.log("Updating existing student:", defaultValues.id);
         try {
-          const url = `/api/students/${result.id}/create-account`;
-          console.log("Making API request to:", url);
-          
-          const response = await fetch(url, {
-            method: 'POST',
+          const response = await fetch(`/api/students/${defaultValues.id}`, {
+            method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(studentData),
             credentials: 'include'
           });
           
           if (!response.ok) {
             const errorText = await response.text();
-            console.error(`Error response (${response.status}):`, errorText);
-            throw new Error(`Request failed with status ${response.status}: ${errorText}`);
+            throw new Error(`Failed to update student: ${errorText}`);
           }
           
-          const responseData = await response.json();
-          console.log("Account creation response:", responseData);
+          const updatedStudent = await response.json();
+          console.log("Updated student result:", updatedStudent);
           
-          // Invalidate the users cache to refresh the user management page
-          queryClient.invalidateQueries({ queryKey: ['/api/users'] });
+          // Still call the parent's onSubmit function for state updates
+          await onSubmit(studentData);
           
-          if (responseData.linked) {
-            toast({
-              title: "Student linked to existing account!",
-              description: `The student has been linked to an existing account with the email ${values.email}.`,
-            });
-          } else {
-            toast({
-              title: "Account created successfully!",
-              description: `A parent account has been created for ${values.guardianName} with the email ${values.email}. A welcome email with login instructions has been sent.`,
-            });
-          }
-        } catch (error: any) {
-          console.error("Error creating parent account:", error);
-          toast({
-            title: "Failed to create account",
-            description: error.message || "There was an error creating the parent account.",
-            variant: "destructive",
+          // No need to create account when editing
+          return;
+        } catch (error) {
+          console.error("Error updating student:", error);
+          throw error;
+        }
+      } else {
+        // Create new student with direct API call
+        console.log("Creating new student with direct API call");
+        
+        try {
+          const response = await fetch('/api/students', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(studentData),
+            credentials: 'include'
           });
-        } finally {
-          setCreatingAccount(false);
+          
+          if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`Failed to create student: ${errorText}`);
+          }
+          
+          const newStudent = await response.json();
+          console.log("New student created:", newStudent);
+          studentId = newStudent.id;
+          
+          // Still call parent onSubmit for state updates
+          await onSubmit(studentData);
+          
+          // Invalidate students query to refresh the list
+          queryClient.invalidateQueries({ queryKey: ['/api/students'] });
+          
+          if (!createAccount) {
+            toast({
+              title: "Success",
+              description: "Student added successfully.",
+            });
+            return;
+          }
+        } catch (error) {
+          console.error("Error creating student:", error);
+          throw error;
+        }
+        
+        // Handle parent account creation if needed
+        if (createAccount) {
+          console.log("Creating parent account for student ID:", studentId);
+          setCreatingAccount(true);
+          
+          try {
+            const url = `/api/students/${studentId}/create-account`;
+            console.log("Making parent account creation API request to:", url);
+            
+            const response = await fetch(url, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              credentials: 'include'
+            });
+            
+            if (!response.ok) {
+              const errorText = await response.text();
+              console.error(`Error creating parent account (${response.status}):`, errorText);
+              throw new Error(`Failed to create parent account: ${errorText}`);
+            }
+            
+            const responseData = await response.json();
+            console.log("Account creation response:", responseData);
+            
+            // Invalidate the users cache to refresh the user management page
+            queryClient.invalidateQueries({ queryKey: ['/api/users'] });
+            
+            if (responseData.linked) {
+              toast({
+                title: "Student linked to existing account!",
+                description: `The student has been linked to an existing account with the email ${values.email}.`,
+              });
+            } else {
+              toast({
+                title: "Account created successfully!",
+                description: `A parent account has been created for ${values.guardianName} with the email ${values.email}. A welcome email with login instructions has been sent.`,
+              });
+            }
+          } catch (error: any) {
+            console.error("Error creating parent account:", error);
+            toast({
+              title: "Failed to create account",
+              description: error.message || "There was an error creating the parent account.",
+              variant: "destructive",
+            });
+          } finally {
+            setCreatingAccount(false);
+          }
         }
       }
     } catch (error) {

@@ -1140,7 +1140,16 @@ export class MemStorage implements IStorage {
     return this.users.get(id);
   }
 
-  async createUser(userData: Omit<InsertUser, 'password' | 'confirmPassword'> & { passwordHash: string }): Promise<User> {
+  async createUser(userData: Omit<InsertUser, 'password' | 'confirmPassword'> & { 
+    passwordHash: string,
+    emailVerified?: boolean,
+    verificationToken?: string | null,
+    verificationTokenExpires?: Date | null,
+    resetPasswordToken?: string | null,
+    resetPasswordExpires?: Date | null,
+    mfaEnabled?: boolean,
+    mfaSecret?: string | null
+  }): Promise<User> {
     const id = this.userId++;
     const now = new Date();
     const user: User = {
