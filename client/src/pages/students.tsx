@@ -114,12 +114,16 @@ export default function Students() {
       if (selectedStudent?.id) {
         console.log("Updating existing student:", selectedStudent.id);
         result = await updateStudentMutation.mutateAsync({ id: selectedStudent.id, data });
+        console.log("Update student mutation result:", result);
       } else {
         console.log("Creating new student");
-        result = await addStudentMutation.mutateAsync(data);
+        // We need the created student with its ID for account creation
+        result = await apiRequest("POST", "/api/students", data);
+        console.log("Direct API call result for creating student:", result);
+        // Still invalidate the queries as we would normally do
+        queryClient.invalidateQueries({ queryKey: ["/api/students"] });
       }
       
-      console.log("Mutation result:", result);
       return result;
     } catch (error) {
       console.error("Error in handleSubmitStudent:", error);
