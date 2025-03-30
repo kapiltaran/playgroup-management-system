@@ -57,6 +57,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // For this demo, we'll check our simple hashed password
       const hashedPassword = `hashed_${password}`;
       
+      console.log(`Login attempt for ${username} with password ${password}`);
+      console.log(`Comparing: ${hashedPassword} with stored: ${user.passwordHash}`);
+      
       if (user.passwordHash !== hashedPassword) {
         return res.status(401).json({ message: "Invalid username or password" });
       }

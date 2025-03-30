@@ -1449,12 +1449,55 @@ export class MemStorage implements IStorage {
         username: 'admin',
         email: 'admin@playgroup.com',
         fullName: 'Administrator',
-        role: 'superadmin',
-        passwordHash: 'hashed_password', // In a real app, this would be properly hashed
+        role: 'superadmin' as 'superadmin', // Type assertion to match required type
+        passwordHash: 'hashed_admin123', // In a real app, this would be properly hashed
         emailVerified: true,
         mfaEnabled: false,
         active: true
       });
+    }
+    
+    // Create test users for different roles
+    const testUsers = [
+      {
+        username: 'john.teacher',
+        email: 'john.teacher@playgroup.com',
+        fullName: 'John Teacher',
+        role: 'teacher' as 'teacher', // Type assertion to match required type
+        passwordHash: 'hashed_teacher123',
+        emailVerified: true,
+        mfaEnabled: false,
+        active: true
+      },
+      {
+        username: 'sarah.admin',
+        email: 'sarah.admin@playgroup.com',
+        fullName: 'Sarah Admin',
+        role: 'officeadmin' as 'officeadmin', // Type assertion to match required type
+        passwordHash: 'hashed_admin123',
+        emailVerified: true,
+        mfaEnabled: false,
+        active: true
+      },
+      {
+        username: 'emily.parent',
+        email: 'john.smith@example.com', // Match with the first student's guardian email
+        fullName: 'Emily Parent',
+        role: 'parent' as 'parent', // Type assertion to match required type
+        passwordHash: 'hashed_parent123',
+        emailVerified: true,
+        mfaEnabled: false,
+        active: true
+      }
+    ];
+    
+    // Create users if they don't exist
+    for (const userData of testUsers) {
+      const userExists = await this.getUserByUsername(userData.username);
+      if (!userExists) {
+        await this.createUser(userData);
+        console.log(`Created test user: ${userData.username} (${userData.role})`);
+      }
     }
     
     // Create default role permissions with proper type definitions

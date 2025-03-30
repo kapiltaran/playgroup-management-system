@@ -142,24 +142,24 @@ export default function LoginPage() {
             <p className="text-muted-foreground mb-2">Sample Accounts:</p>
             <div className="grid grid-cols-2 gap-2 text-xs">
               <div className="border rounded-md p-1">
-                <p className="font-medium">Admin</p>
+                <p className="font-medium">Superadmin</p>
                 <p>Username: admin</p>
-                <p>Password: password123</p>
+                <p>Password: admin123</p>
               </div>
               <div className="border rounded-md p-1">
                 <p className="font-medium">Teacher</p>
-                <p>Username: teacher</p>
-                <p>Password: password123</p>
+                <p>Username: john.teacher</p>
+                <p>Password: teacher123</p>
               </div>
               <div className="border rounded-md p-1">
                 <p className="font-medium">Office Admin</p>
-                <p>Username: office</p>
-                <p>Password: password123</p>
+                <p>Username: sarah.admin</p>
+                <p>Password: admin123</p>
               </div>
               <div className="border rounded-md p-1">
                 <p className="font-medium">Parent</p>
-                <p>Username: parent</p>
-                <p>Password: password123</p>
+                <p>Username: emily.parent</p>
+                <p>Password: parent123</p>
               </div>
             </div>
           </div>
