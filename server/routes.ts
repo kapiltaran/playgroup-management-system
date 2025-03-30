@@ -10,7 +10,8 @@ import {
   insertFeeStructureSchema,
   insertFeeInstallmentSchema,
   insertFeePaymentSchema,
-  insertReminderSchema
+  insertReminderSchema,
+  insertSettingsSchema
 } from "@shared/schema";
 import { ZodError } from "zod";
 
@@ -814,6 +815,63 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching monthly fee collection:", error);
       res.status(500).json({ message: "Failed to fetch monthly fee collection" });
+    }
+  });
+
+  // Settings routes
+  app.get("/api/settings", async (req: Request, res: Response) => {
+    try {
+      const settings = await storage.getSettings();
+      res.json(settings);
+    } catch (error) {
+      console.error("Error fetching settings:", error);
+      res.status(500).json({ message: "Failed to fetch settings" });
+    }
+  });
+
+  app.get("/api/settings/:key", async (req: Request, res: Response) => {
+    try {
+      const key = req.params.key;
+      const setting = await storage.getSetting(key);
+      
+      if (!setting) {
+        return res.status(404).json({ message: "Setting not found" });
+      }
+      
+      res.json(setting);
+    } catch (error) {
+      console.error("Error fetching setting:", error);
+      res.status(500).json({ message: "Failed to fetch setting" });
+    }
+  });
+
+  app.post("/api/settings", async (req: Request, res: Response) => {
+    try {
+      const insertData = insertSettingsSchema.parse(req.body);
+      const setting = await storage.createOrUpdateSetting(insertData);
+      res.status(201).json(setting);
+    } catch (error) {
+      handleZodError(error, res);
+    }
+  });
+
+  app.delete("/api/settings/:id", async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid setting ID" });
+      }
+      
+      const success = await storage.deleteSetting(id);
+      
+      if (!success) {
+        return res.status(404).json({ message: "Setting not found or cannot be deleted" });
+      }
+      
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting setting:", error);
+      res.status(500).json({ message: "Failed to delete setting" });
     }
   });
 

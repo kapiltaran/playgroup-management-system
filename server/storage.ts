@@ -16,7 +16,9 @@ import {
   type FeePayment,
   type InsertFeePayment,
   type Reminder,
-  type InsertReminder
+  type InsertReminder,
+  type Setting,
+  type InsertSetting
 } from "@shared/schema";
 
 // Storage interface
@@ -87,6 +89,12 @@ export interface IStorage {
   // Activity methods
   getActivities(limit?: number): Promise<Activity[]>;
   createActivity(activity: InsertActivity): Promise<Activity>;
+  
+  // Settings methods
+  getSettings(): Promise<Setting[]>;
+  getSetting(key: string): Promise<Setting | undefined>;
+  createOrUpdateSetting(setting: InsertSetting): Promise<Setting>;
+  deleteSetting(id: number): Promise<boolean>;
 }
 
 export class MemStorage implements IStorage {
@@ -99,6 +107,7 @@ export class MemStorage implements IStorage {
   private feeInstallments: Map<number, FeeInstallment>;
   private feePayments: Map<number, FeePayment>;
   private reminders: Map<number, Reminder>;
+  private settings: Map<number, Setting>;
   
   private studentId: number;
   private expenseId: number;
@@ -109,6 +118,7 @@ export class MemStorage implements IStorage {
   private feeInstallmentId: number;
   private feePaymentId: number;
   private reminderId: number;
+  private settingId: number;
 
   constructor() {
     this.students = new Map();
@@ -120,6 +130,7 @@ export class MemStorage implements IStorage {
     this.feeInstallments = new Map();
     this.feePayments = new Map();
     this.reminders = new Map();
+    this.settings = new Map();
     
     this.studentId = 1;
     this.expenseId = 1;
@@ -130,6 +141,7 @@ export class MemStorage implements IStorage {
     this.feeInstallmentId = 1;
     this.feePaymentId = 1;
     this.reminderId = 1;
+    this.settingId = 1;
     
     // Initialize with sample data asynchronously
     setTimeout(() => {
@@ -975,8 +987,90 @@ export class MemStorage implements IStorage {
     return activity;
   }
 
+  // Settings methods
+  async getSettings(): Promise<Setting[]> {
+    return Array.from(this.settings.values()).sort((a, b) => b.id - a.id);
+  }
+
+  async getSetting(key: string): Promise<Setting | undefined> {
+    // Find the setting with the matching key
+    const settings = Array.from(this.settings.values());
+    return settings.find(setting => setting.key === key);
+  }
+
+  async createOrUpdateSetting(setting: InsertSetting): Promise<Setting> {
+    // Check if the setting with this key already exists
+    const existingSetting = await this.getSetting(setting.key);
+    
+    if (existingSetting) {
+      // Update existing setting
+      const updatedSetting = {
+        ...existingSetting,
+        value: setting.value,
+        description: setting.description || null,
+        updatedAt: new Date()
+      };
+      this.settings.set(existingSetting.id, updatedSetting);
+
+      // Log activity
+      this.createActivity({
+        type: 'settings',
+        action: 'update',
+        details: { settingKey: setting.key, value: setting.value }
+      });
+      
+      return updatedSetting;
+    } else {
+      // Create new setting
+      const id = this.settingId++;
+      const now = new Date();
+      const newSetting: Setting = { 
+        id,
+        key: setting.key,
+        value: setting.value,
+        description: setting.description || null,
+        updatedAt: now
+      };
+      this.settings.set(id, newSetting);
+
+      // Log activity
+      this.createActivity({
+        type: 'settings',
+        action: 'create',
+        details: { settingKey: setting.key, value: setting.value }
+      });
+      
+      return newSetting;
+    }
+  }
+
+  async deleteSetting(id: number): Promise<boolean> {
+    const setting = this.settings.get(id);
+    if (!setting) return false;
+    
+    const success = this.settings.delete(id);
+    
+    if (success) {
+      // Log activity
+      this.createActivity({
+        type: 'settings',
+        action: 'delete',
+        details: { settingKey: setting.key }
+      });
+    }
+    
+    return success;
+  }
+
   // Initialize sample data
   private async initializeSampleData() {
+    // Initial settings
+    await this.createOrUpdateSetting({
+      key: "currency",
+      value: "USD",
+      description: "Default currency for fees and expenses"
+    });
+    
     // Initial classes
     const classes = [
       {

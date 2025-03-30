@@ -12,6 +12,7 @@ import Reports from "@/pages/reports";
 import Classes from "@/pages/classes";
 import FeeManagement from "@/pages/fee-management";
 import FeePayments from "@/pages/fee-payments";
+import Settings from "@/pages/settings";
 
 function Router() {
   return (
@@ -26,6 +27,7 @@ function Router() {
         <Route path="/expenses" component={Expenses} />
         <Route path="/inventory" component={Inventory} />
         <Route path="/reports" component={Reports} />
+        <Route path="/settings" component={Settings} />
         <Route component={NotFound} />
       </Switch>
     </AppLayout>
