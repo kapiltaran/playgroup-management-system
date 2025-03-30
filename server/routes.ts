@@ -63,8 +63,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const studentData = insertStudentSchema.parse(req.body);
       const student = await storage.createStudent(studentData);
+      console.log("Created student with ID:", student.id);
       res.status(201).json(student);
     } catch (error) {
+      console.error("Error creating student:", error);
       handleZodError(error, res);
     }
   });
@@ -1308,23 +1310,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const studentId = parseInt(req.params.id);
       if (isNaN(studentId)) {
+        console.error("Invalid student ID format:", req.params.id);
         return res.status(400).json({ message: "Invalid student ID format" });
       }
+      
+      console.log("Creating account for student ID:", studentId);
       
       // Get the student
       const student = await storage.getStudent(studentId);
       if (!student) {
+        console.error("Student not found with ID:", studentId);
         return res.status(404).json({ message: "Student not found" });
       }
       
+      console.log("Found student:", { id: student.id, fullName: student.fullName, email: student.email });
+      
       // Check if student has an email
       if (!student.email) {
+        console.error("Student has no email:", studentId);
         return res.status(400).json({ message: "Student must have an email to create an account" });
       }
       
       // Check if email is already registered
       const existingUser = await storage.getUserByEmail(student.email);
       if (existingUser) {
+        console.log("Email already registered, linking student to existing user:", { 
+          email: student.email, 
+          userId: existingUser.id,
+          studentId: student.id
+        });
+        
         // If user exists, associate the student with this user account
         const updatedUser = await storage.updateUser(existingUser.id, { 
           studentId: studentId 
@@ -1353,6 +1368,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       
+      console.log("Creating new user account for student:", { 
+        studentId: student.id, 
+        fullName: student.fullName,
+        guardianName: student.guardianName,
+        email: student.email
+      });
+      
       // Create user from student
       const baseUrl = `${req.protocol}://${req.get('host')}`;
       const { user, password } = await createUserFromStudent(
@@ -1363,9 +1385,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         baseUrl
       );
       
+      console.log("User account created successfully:", { 
+        userId: user.id, 
+        username: user.username, 
+        role: user.role 
+      });
+      
       // Send welcome email with temporary password
       const loginUrl = `${baseUrl}/login`;
       await sendWelcomeEmail(user, password, loginUrl);
+      
+      console.log("Welcome email sent to:", user.email);
       
       res.status(201).json({ 
         message: "User account created successfully",
@@ -1379,7 +1409,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error) {
       console.error("Error creating user account from student:", error);
-      res.status(500).json({ message: "Failed to create user account" });
+      res.status(500).json({ message: "Failed to create user account", error: error.message });
     }
   });
 
