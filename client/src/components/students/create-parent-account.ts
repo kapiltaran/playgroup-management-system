@@ -6,25 +6,41 @@ import { Student } from "@shared/schema";
  * It handles all potential error cases directly
  */
 export async function createParentAccount(studentId: number): Promise<boolean> {
-  console.log("createParentAccount called with studentId:", studentId);
+  console.log("🔍 createParentAccount called with studentId:", studentId);
   
   if (!studentId || isNaN(studentId)) {
-    console.error("Invalid studentId for parent account creation:", studentId);
+    console.error("🚫 Invalid studentId for parent account creation:", studentId);
     throw new Error("Invalid student ID. Cannot create parent account.");
   }
   
+  // For diagnosis - directly use fetch to see if we have any issues with the API request
+  const endpoint = `/api/students/${studentId}/create-account`;
+  console.log("🌐 Attempting direct fetch to endpoint:", endpoint);
+  
   try {
-    // Make the API request
-    const responseData = await apiRequest(
-      "POST", 
-      `/api/students/${studentId}/create-account`, 
-      null
-    );
+    // First try with direct fetch for debugging
+    const fetchResponse = await fetch(endpoint, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      credentials: "include"
+    });
     
-    console.log("Parent account creation response:", responseData);
+    console.log("📝 Direct fetch response status:", fetchResponse.status);
+    console.log("📝 Direct fetch response status text:", fetchResponse.statusText);
+    
+    if (!fetchResponse.ok) {
+      const errorText = await fetchResponse.text();
+      console.error("🚨 Server error response:", errorText);
+      throw new Error(`API request failed: ${fetchResponse.status} ${errorText}`);
+    }
+    
+    const responseData = await fetchResponse.json();
+    console.log("✅ Parent account creation response:", responseData);
     return true;
   } catch (error) {
-    console.error("Error creating parent account:", error);
+    console.error("❌ Error creating parent account:", error);
     throw error;
   }
 }

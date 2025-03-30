@@ -1637,6 +1637,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   // Create user account from student
   app.post("/api/students/:id/create-account", async (req: Request, res: Response) => {
+    console.log("🚀 Parent account creation endpoint called with params:", req.params);
+    
     try {
       // Import necessary services
       const { createUserFromStudent } = await import('./services/auth');
@@ -1644,11 +1646,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const studentId = parseInt(req.params.id);
       if (isNaN(studentId)) {
-        console.error("Invalid student ID format:", req.params.id);
+        console.error("❌ Invalid student ID format:", req.params.id);
         return res.status(400).json({ message: "Invalid student ID format" });
       }
       
-      console.log("Creating account for student ID:", studentId);
+      console.log("✅ Attempting account creation for student ID:", studentId);
       
       // Get the student from database
       // This line is critical - we need to ensure we're getting a valid student
