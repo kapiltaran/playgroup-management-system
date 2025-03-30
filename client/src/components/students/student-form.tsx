@@ -111,8 +111,15 @@ export function StudentForm({
       }
       
       // Call the regular onSubmit provided by parent component
-      const result = await onSubmit(studentData);
-      console.log("Student created successfully:", result);
+      console.log("Submitting student data:", studentData);
+      let result;
+      try {
+        result = await onSubmit(studentData);
+        console.log("Student created successfully:", result);
+      } catch (error) {
+        console.error("Error in onSubmit:", error);
+        throw error;
+      }
       
       // If createAccount is selected and we're adding a new student (not editing)
       // If result has an ID, use it for account creation

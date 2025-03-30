@@ -106,10 +106,23 @@ export default function Students() {
   };
 
   const handleSubmitStudent = async (data: any): Promise<any> => {
-    if (selectedStudent?.id) {
-      return updateStudentMutation.mutateAsync({ id: selectedStudent.id, data });
-    } else {
-      return addStudentMutation.mutateAsync(data);
+    try {
+      console.log("handleSubmitStudent called with data:", data);
+      let result;
+      
+      if (selectedStudent?.id) {
+        console.log("Updating existing student:", selectedStudent.id);
+        result = await updateStudentMutation.mutateAsync({ id: selectedStudent.id, data });
+      } else {
+        console.log("Creating new student");
+        result = await addStudentMutation.mutateAsync(data);
+      }
+      
+      console.log("Mutation result:", result);
+      return result;
+    } catch (error) {
+      console.error("Error in handleSubmitStudent:", error);
+      throw error;
     }
   };
 
