@@ -35,6 +35,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Student routes
   app.get("/api/students", async (req: Request, res: Response) => {
     try {
+      // Check if the request has a user property (from an auth middleware)
+      const user = (req as any).user;
+      
+      // If there's a logged-in user and they are a parent, only show their students
+      if (user && user.role === 'parent') {
+        console.log(`Filtering students for parent user ID: ${user.id}`);
+        const students = await storage.getStudentsByParent(user.id);
+        return res.json(students);
+      }
+      
+      // For all other cases (admin, teacher, etc.), show all students
       const students = await storage.getStudents();
       res.json(students);
     } catch (error) {
@@ -50,6 +61,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       if (!student) {
         return res.status(404).json({ message: "Student not found" });
+      }
+      
+      // Check if the request has a user property (from an auth middleware)
+      const user = (req as any).user;
+      
+      // If there's a logged-in user and they are a parent, check access
+      if (user && user.role === 'parent') {
+        // Get students this parent has access to
+        const allowedStudents = await storage.getStudentsByParent(user.id);
+        const hasAccess = allowedStudents.some(s => s.id === student.id);
+        
+        if (!hasAccess) {
+          console.log(`Parent ${user.id} denied access to student ${id}`);
+          return res.status(403).json({ message: "Access denied" });
+        }
+        
+        console.log(`Parent ${user.id} granted access to student ${id}`);
       }
       
       res.json(student);
@@ -618,6 +646,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const studentId = req.query.studentId ? parseInt(req.query.studentId as string) : undefined;
       const installmentId = req.query.installmentId ? parseInt(req.query.installmentId as string) : undefined;
       
+      // Check if the request has a user property (from an auth middleware)
+      const user = (req as any).user;
+      
+      // If there's a specific student ID requested and user is a parent
+      if (studentId && user && user.role === 'parent') {
+        // Get students this parent has access to
+        const allowedStudents = await storage.getStudentsByParent(user.id);
+        const hasAccess = allowedStudents.some(s => s.id === studentId);
+        
+        if (!hasAccess) {
+          console.log(`Parent ${user.id} denied access to fee payments for student ${studentId}`);
+          return res.status(403).json({ message: "Access denied" });
+        }
+        
+        console.log(`Parent ${user.id} granted access to fee payments for student ${studentId}`);
+      }
+      // If no specific student ID but user is a parent, we need to filter to only show their students' payments
+      else if (!studentId && user && user.role === 'parent') {
+        // Get all students this parent has access to
+        const allowedStudents = await storage.getStudentsByParent(user.id);
+        
+        if (allowedStudents.length === 0) {
+          // No students to check, return empty array
+          return res.json([]);
+        }
+        
+        // Get payments for all their students
+        let allPayments: any[] = [];
+        for (const student of allowedStudents) {
+          const studentPayments = await storage.getFeePayments(student.id, installmentId);
+          allPayments = allPayments.concat(studentPayments);
+        }
+        
+        console.log(`Parent ${user.id} accessed fee payments for their ${allowedStudents.length} students`);
+        return res.json(allPayments);
+      }
+      
+      // For non-parent users or when parent requests their specific student with proper access
       const payments = await storage.getFeePayments(studentId, installmentId);
       res.json(payments);
     } catch (error) {
@@ -636,6 +702,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const payment = await storage.getFeePayment(paymentId);
       if (!payment) {
         return res.status(404).json({ message: "Fee payment not found" });
+      }
+      
+      // Check if the request has a user property (from an auth middleware)
+      const user = (req as any).user;
+      
+      // If user is a parent, check if they have access to this payment's student
+      if (user && user.role === 'parent') {
+        // Get students this parent has access to
+        const allowedStudents = await storage.getStudentsByParent(user.id);
+        const hasAccess = allowedStudents.some(s => s.id === payment.studentId);
+        
+        if (!hasAccess) {
+          console.log(`Parent ${user.id} denied access to fee payment ${paymentId} for student ${payment.studentId}`);
+          return res.status(403).json({ message: "Access denied" });
+        }
+        
+        console.log(`Parent ${user.id} granted access to fee payment ${paymentId}`);
       }
       
       res.json(payment);
@@ -699,6 +782,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/reminders", async (req: Request, res: Response) => {
     try {
       const studentId = req.query.studentId ? parseInt(req.query.studentId as string) : undefined;
+      
+      // Check if the request has a user property (from an auth middleware)
+      const user = (req as any).user;
+      
+      // If there's a specific student ID requested and user is a parent
+      if (studentId && user && user.role === 'parent') {
+        // Get students this parent has access to
+        const allowedStudents = await storage.getStudentsByParent(user.id);
+        const hasAccess = allowedStudents.some(s => s.id === studentId);
+        
+        if (!hasAccess) {
+          console.log(`Parent ${user.id} denied access to reminders for student ${studentId}`);
+          return res.status(403).json({ message: "Access denied" });
+        }
+        
+        console.log(`Parent ${user.id} granted access to reminders for student ${studentId}`);
+      }
+      // If no specific student ID but user is a parent, filter to only show their students' reminders
+      else if (!studentId && user && user.role === 'parent') {
+        // Get all students this parent has access to
+        const allowedStudents = await storage.getStudentsByParent(user.id);
+        
+        if (allowedStudents.length === 0) {
+          // No students to check, return empty array
+          return res.json([]);
+        }
+        
+        // Get reminders for all their students
+        let allReminders: any[] = [];
+        for (const student of allowedStudents) {
+          const studentReminders = await storage.getReminders(student.id);
+          allReminders = allReminders.concat(studentReminders);
+        }
+        
+        console.log(`Parent ${user.id} accessed reminders for their ${allowedStudents.length} students`);
+        return res.json(allReminders);
+      }
+      
+      // For non-parent users or when parent requests their specific student with proper access
       const reminders = await storage.getReminders(studentId);
       res.json(reminders);
     } catch (error) {
@@ -717,6 +839,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const reminder = await storage.getReminder(reminderId);
       if (!reminder) {
         return res.status(404).json({ message: "Reminder not found" });
+      }
+      
+      // Check if the request has a user property (from an auth middleware)
+      const user = (req as any).user;
+      
+      // If user is a parent, check if they have access to this reminder's student
+      if (user && user.role === 'parent') {
+        // Get students this parent has access to
+        const allowedStudents = await storage.getStudentsByParent(user.id);
+        const hasAccess = allowedStudents.some(s => s.id === reminder.studentId);
+        
+        if (!hasAccess) {
+          console.log(`Parent ${user.id} denied access to reminder ${reminderId} for student ${reminder.studentId}`);
+          return res.status(403).json({ message: "Access denied" });
+        }
+        
+        console.log(`Parent ${user.id} granted access to reminder ${reminderId}`);
       }
       
       res.json(reminder);
@@ -780,6 +919,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/fee-reports/pending", async (req: Request, res: Response) => {
     try {
       const classId = req.query.classId ? parseInt(req.query.classId as string) : undefined;
+      
+      // Check if the request has a user property (from an auth middleware)
+      const user = (req as any).user;
+      
+      // If user is a parent, we need to filter the pending fees to only their students
+      if (user && user.role === 'parent') {
+        // Get allowed students for this parent
+        const allowedStudents = await storage.getStudentsByParent(user.id);
+        
+        if (allowedStudents.length === 0) {
+          // No students, return empty array
+          return res.json([]);
+        }
+        
+        // Get all pending fees for the class (if specified) or all classes
+        const allPendingFees = await storage.getPendingFees(classId);
+        
+        // Filter to only include fees for this parent's students
+        const filteredFees = allPendingFees.filter(fee => 
+          allowedStudents.some(student => student.id === fee.studentId)
+        );
+        
+        console.log(`Parent ${user.id} accessed pending fees report for their ${allowedStudents.length} students`);
+        return res.json(filteredFees);
+      }
+      
+      // For non-parent users, show all pending fees
       const pendingFees = await storage.getPendingFees(classId);
       res.json(pendingFees);
     } catch (error) {

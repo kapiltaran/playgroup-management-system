@@ -30,6 +30,7 @@ export interface IStorage {
   // Student methods
   getStudents(): Promise<Student[]>;
   getStudentsByClass(classId: number): Promise<Student[]>;
+  getStudentsByParent(userId: number): Promise<Student[]>;
   getStudent(id: number): Promise<Student | undefined>;
   createStudent(student: InsertStudent): Promise<Student>;
   updateStudent(id: number, student: Partial<InsertStudent>): Promise<Student | undefined>;
@@ -451,6 +452,28 @@ export class MemStorage implements IStorage {
   async getStudentsByClass(classId: number): Promise<Student[]> {
     return Array.from(this.students.values())
       .filter(student => student.classId === classId)
+      .sort((a, b) => b.id - a.id);
+  }
+
+  async getStudentsByParent(userId: number): Promise<Student[]> {
+    // Get the user to check if it's a parent
+    const user = this.users.get(userId);
+    if (!user || user.role !== 'parent') {
+      return [];
+    }
+
+    // For parents, we only return students linked to their account
+    return Array.from(this.students.values())
+      .filter(student => {
+        // Check if the student is linked to this parent user
+        if (user.studentId === student.id) {
+          return true;
+        }
+        
+        // Also check if the student has the same email as the parent
+        // This allows parents to see all their children
+        return student.email && student.email === user.email;
+      })
       .sort((a, b) => b.id - a.id);
   }
 
