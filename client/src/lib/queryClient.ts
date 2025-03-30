@@ -8,27 +8,14 @@ async function throwIfResNotOk(res: Response) {
 }
 
 export async function apiRequest<T = any>(
-  urlOrPathOrConfig: string | { url: string, method?: string, data?: unknown },
-  method: string = 'GET',
-  data?: unknown | undefined,
+  method: string, 
+  url: string, 
+  data?: unknown | undefined
 ): Promise<T> {
-  let url: string;
-  let finalMethod: string = method;
-  let finalData: unknown | undefined = data;
-  
-  // Handle the case where the first argument is an object
-  if (typeof urlOrPathOrConfig === 'object') {
-    url = urlOrPathOrConfig.url;
-    finalMethod = urlOrPathOrConfig.method || 'GET';
-    finalData = urlOrPathOrConfig.data;
-  } else {
-    url = urlOrPathOrConfig;
-  }
-  
   const res = await fetch(url, {
-    method: finalMethod,
-    headers: finalData ? { "Content-Type": "application/json" } : {},
-    body: finalData ? JSON.stringify(finalData) : undefined,
+    method: method,
+    headers: data ? { "Content-Type": "application/json" } : {},
+    body: data ? JSON.stringify(data) : undefined,
     credentials: "include",
   });
 
