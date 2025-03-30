@@ -296,6 +296,29 @@ export default function FeeManagement() {
     }
   };
 
+  // Handle clone fee installment
+  const handleCloneInstallment = (installment: FeeInstallment) => {
+    // Set up the clone data - we'll use the same data but with a "Copy of" prefix for the name
+    const cloneData = {
+      feeStructureId: installment.feeStructureId,
+      name: `Copy of ${installment.name}`,
+      amount: installment.amount.toString(),
+      dueDate: new Date(installment.dueDate).toISOString().split('T')[0]
+    };
+    
+    // Set the form data with the clone values
+    setInstallmentFormData(cloneData);
+    
+    // Set the form mode to add (since we're creating a new installment)
+    setInstallmentFormMode("add");
+    
+    // Open the form dialog
+    setIsInstallmentFormOpen(true);
+    
+    // Set selected structure ID to make sure it's pre-selected
+    setSelectedStructureId(installment.feeStructureId);
+  };
+
   // Handle installment form submission
   const handleInstallmentSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -532,12 +555,29 @@ export default function FeeManagement() {
                   header: "Actions",
                   cell: (item) => (
                     <div className="flex space-x-2">
-                      <Button variant="outline" size="sm" onClick={() => handleEditInstallment(item)}>
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        title="Clone Installment" 
+                        onClick={() => handleCloneInstallment(item)}
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <rect x="8" y="8" width="12" height="12" rx="2" ry="2" />
+                          <path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2" />
+                        </svg>
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        title="Edit Installment"
+                        onClick={() => handleEditInstallment(item)}
+                      >
                         <PencilIcon className="h-4 w-4" />
                       </Button>
                       <Button 
                         variant="destructive" 
                         size="sm" 
+                        title="Delete Installment"
                         onClick={() => handleDeleteInstallment(item.id)}
                       >
                         <TrashIcon className="h-4 w-4" />
