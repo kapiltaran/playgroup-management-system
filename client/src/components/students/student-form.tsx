@@ -116,15 +116,9 @@ export function StudentForm({
       if (createAccount && !isEditing && result?.id) {
         setCreatingAccount(true);
         
-        const response = await fetch(`/api/students/${result.id}/create-account`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          }
-        });
-        
-        if (response.ok) {
-          const data = await response.json();
+        // Create an account for the parent
+        try {
+          const data = await apiRequest('POST', `/api/students/${result.id}/create-account`);
           
           if (data.linked) {
             toast({
@@ -137,8 +131,7 @@ export function StudentForm({
               description: `A parent account has been created for ${values.guardianName} with the email ${values.email}. A welcome email with login instructions has been sent.`,
             });
           }
-        } else {
-          const error = await response.json();
+        } catch (error: any) {
           toast({
             title: "Failed to create account",
             description: error.message || "There was an error creating the parent account.",
