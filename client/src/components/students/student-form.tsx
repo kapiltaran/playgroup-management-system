@@ -3,6 +3,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { insertStudentSchema } from "@shared/schema";
+import { QueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import {
   Form,
@@ -33,7 +34,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 
 const formSchema = insertStudentSchema.extend({
   fullName: z.string().min(2, "Full name must be at least 2 characters"),
@@ -146,6 +147,9 @@ export function StudentForm({
           
           const responseData = await response.json();
           console.log("Account creation response:", responseData);
+          
+          // Invalidate the users cache to refresh the user management page
+          queryClient.invalidateQueries({ queryKey: ['/api/users'] });
           
           if (responseData.linked) {
             toast({
