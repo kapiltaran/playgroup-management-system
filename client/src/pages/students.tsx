@@ -9,6 +9,7 @@ import { UsersIcon, PencilIcon, Trash2Icon } from "lucide-react";
 import { StudentForm } from "@/components/students/student-form";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/context/auth-context";
 import { 
   AlertDialog,
   AlertDialogAction,
@@ -23,9 +24,12 @@ import type { Student } from "@shared/schema";
 
 export default function Students() {
   const { toast } = useToast();
+  const { user } = useAuth();
   const [isStudentFormOpen, setIsStudentFormOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
+  
+  const isParent = user?.role === 'parent';
 
   // Fetch students
   const { data: students, isLoading: isLoadingStudents } = useQuery<Student[]>({
@@ -165,12 +169,14 @@ export default function Students() {
     <div className="max-w-7xl mx-auto">
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Students</h1>
-        <Button onClick={() => {
-          setSelectedStudent(null);
-          setIsStudentFormOpen(true);
-        }}>
-          <UsersIcon className="mr-2 h-4 w-4" /> Add New Student
-        </Button>
+        {!isParent && (
+          <Button onClick={() => {
+            setSelectedStudent(null);
+            setIsStudentFormOpen(true);
+          }}>
+            <UsersIcon className="mr-2 h-4 w-4" /> Add New Student
+          </Button>
+        )}
       </div>
 
       <div className="bg-white shadow rounded-lg">
@@ -222,14 +228,18 @@ export default function Students() {
               accessorKey: "id",
               header: "Actions",
               cell: (student) => (
-                <div className="flex space-x-2">
-                  <Button variant="outline" size="sm" onClick={() => handleEditStudent(student)}>
-                    <PencilIcon className="h-4 w-4" />
-                  </Button>
-                  <Button variant="outline" size="sm" onClick={() => handleDeleteStudent(student)}>
-                    <Trash2Icon className="h-4 w-4" />
-                  </Button>
-                </div>
+                !isParent ? (
+                  <div className="flex space-x-2">
+                    <Button variant="outline" size="sm" onClick={() => handleEditStudent(student)}>
+                      <PencilIcon className="h-4 w-4" />
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={() => handleDeleteStudent(student)}>
+                      <Trash2Icon className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="text-sm text-gray-500">No actions available</div>
+                )
               )
             }
           ]}
