@@ -136,6 +136,13 @@ export function StudentForm({
           // Use the parent component's mutation through onSubmit
           const newStudent = await onSubmit(studentData);
           console.log("New student created:", newStudent);
+          
+          // Make sure we have a valid student object with ID
+          if (!newStudent || typeof newStudent !== 'object') {
+            throw new Error("Student creation failed - invalid response");
+          }
+          
+          console.log("New student ID:", newStudent.id);
           studentId = newStudent.id;
           
           if (!createAccount) {
@@ -157,6 +164,10 @@ export function StudentForm({
           
           try {
             console.log("Making parent account creation API request for student ID:", studentId);
+            
+            if (!studentId) {
+              throw new Error("Student ID is undefined. Cannot create parent account.");
+            }
             
             // Use apiRequest helper instead of fetch to ensure consistent URL formatting
             // apiRequest directly returns the JSON response data, not a Response object

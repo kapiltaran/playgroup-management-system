@@ -38,18 +38,23 @@ export default function Students() {
 
   // Add student mutation
   const addStudentMutation = useMutation({
-    mutationFn: (newStudent: any) => 
-      apiRequest("POST", "/api/students", newStudent),
+    mutationFn: async (newStudent: any) => {
+      console.log("API request to create student:", newStudent);
+      const response = await apiRequest("POST", "/api/students", newStudent);
+      console.log("API response from creating student:", response);
+      return response; // Make sure we return the response
+    },
     onSuccess: (data) => {
+      console.log("addStudentMutation onSuccess data:", data);
       queryClient.invalidateQueries({ queryKey: ["/api/students"] });
       setIsStudentFormOpen(false);
       toast({
         title: "Success",
         description: "Student added successfully",
       });
-      return data; // Return the data so it's available to mutateAsync
     },
     onError: (error) => {
+      console.error("addStudentMutation onError:", error);
       toast({
         title: "Error",
         description: `Failed to add student: ${error.message}`,
