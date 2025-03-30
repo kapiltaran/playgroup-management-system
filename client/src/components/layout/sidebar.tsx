@@ -10,7 +10,8 @@ import {
   GraduationCapIcon,
   ReceiptIcon,
   ClipboardCheckIcon,
-  ShieldIcon
+  ShieldIcon,
+  UserCogIcon
 } from "lucide-react";
 
 interface SidebarProps {
@@ -60,6 +61,11 @@ export default function Sidebar({ setOpen }: SidebarProps) {
       href: "/reports",
       label: "Reports",
       icon: <BarChart3Icon className="text-xl mr-3" />
+    },
+    {
+      href: "/user-management",
+      label: "User Management",
+      icon: <UserCogIcon className="text-xl mr-3" />
     },
     {
       href: "/settings",
