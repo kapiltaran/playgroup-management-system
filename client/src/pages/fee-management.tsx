@@ -448,14 +448,14 @@ export default function FeeManagement() {
             <div className="flex items-center space-x-4">
               <h2 className="text-xl font-semibold">Installments</h2>
               <Select 
-                value={selectedStructureId?.toString() || ""} 
-                onValueChange={(value) => setSelectedStructureId(value ? parseInt(value) : null)}
+                value={selectedStructureId?.toString() || "all"} 
+                onValueChange={(value) => setSelectedStructureId(value !== "all" ? parseInt(value) : null)}
               >
                 <SelectTrigger className="w-[250px]">
                   <SelectValue placeholder="Filter by Fee Structure" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All Fee Structures</SelectItem>
+                  <SelectItem value="all">All Fee Structures</SelectItem>
                   {feeStructures?.map((structure) => (
                     <SelectItem key={structure.id} value={structure.id.toString()}>
                       {structure.name}
