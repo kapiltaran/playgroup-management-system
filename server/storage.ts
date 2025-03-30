@@ -462,17 +462,32 @@ export class MemStorage implements IStorage {
       return [];
     }
 
+    console.log(`Finding students for parent user ID ${userId}, email: ${user.email}, linked student: ${user.studentId}`);
+
     // For parents, we only return students linked to their account
     return Array.from(this.students.values())
       .filter(student => {
         // Check if the student is linked to this parent user
         if (user.studentId === student.id) {
+          console.log(`Student ${student.id} (${student.fullName}) matches parent's studentId`);
           return true;
         }
         
         // Also check if the student has the same email as the parent
         // This allows parents to see all their children
-        return student.email && student.email === user.email;
+        if (student.email && user.email && student.email === user.email) {
+          console.log(`Student ${student.id} (${student.fullName}) matches parent's email: ${user.email}`);
+          return true;
+        }
+
+        // Also check if the parent's email matches the guardian's email in the student record
+        // This is useful when the parent account uses the guardian's email
+        if (student.email && user.email && student.email.toLowerCase() === user.email.toLowerCase()) {
+          console.log(`Student ${student.id} (${student.fullName}) guardian email matches parent's email: ${user.email}`);
+          return true;
+        }
+        
+        return false;
       })
       .sort((a, b) => b.id - a.id);
   }

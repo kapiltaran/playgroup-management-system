@@ -31,6 +31,61 @@ export async function registerRoutes(app: Express): Promise<Server> {
     console.error("Unexpected error:", error);
     return res.status(500).json({ message: "Internal server error" });
   };
+  
+  // Authentication routes
+  app.post("/api/auth/login", async (req: Request, res: Response) => {
+    try {
+      const { username, password } = req.body;
+      
+      if (!username || !password) {
+        return res.status(400).json({ message: "Username and password are required" });
+      }
+      
+      // Find user by username
+      const user = await storage.getUserByUsername(username);
+      
+      if (!user) {
+        return res.status(401).json({ message: "Invalid username or password" });
+      }
+      
+      // Check if user is active
+      if (!user.active) {
+        return res.status(403).json({ message: "Your account is inactive. Please contact administrator." });
+      }
+      
+      // In a real application, we would verify the password hash
+      // For this demo, we'll check our simple hashed password
+      const hashedPassword = `hashed_${password}`;
+      
+      if (user.passwordHash !== hashedPassword) {
+        return res.status(401).json({ message: "Invalid username or password" });
+      }
+      
+      // Create a user session
+      const session = {
+        id: user.id,
+        username: user.username,
+        email: user.email,
+        fullName: user.fullName,
+        role: user.role,
+        studentId: user.studentId
+      };
+      
+      // Set up session in a real app, we'd use JWT or session middleware
+      
+      console.log(`User ${username} (${user.role}) logged in successfully`);
+      
+      // Return user data (excluding password hash)
+      const { passwordHash, ...userData } = user;
+      res.json({ 
+        message: "Login successful",
+        user: userData
+      });
+    } catch (error) {
+      console.error("Login error:", error);
+      res.status(500).json({ message: "An error occurred during login" });
+    }
+  });
 
   // Student routes
   app.get("/api/students", async (req: Request, res: Response) => {
