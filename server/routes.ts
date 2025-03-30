@@ -1637,7 +1637,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   // Create user account from student
   app.post("/api/students/:id/create-account", async (req: Request, res: Response) => {
-    console.log("🚀 Parent account creation endpoint called with params:", req.params);
+    console.log("\n\n==============================================");
+    console.log("💥 PARENT ACCOUNT CREATION REQUEST RECEIVED 💥");
+    console.log("==============================================");
+    console.log("Request params:", req.params);
+    console.log("Request user session:", req.session);
+    console.log("Student ID from request:", req.params.id);
     
     try {
       // Import necessary services
@@ -1646,25 +1651,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const studentId = parseInt(req.params.id);
       if (isNaN(studentId)) {
-        console.error("❌ Invalid student ID format:", req.params.id);
+        console.error("❌ CRITICAL ERROR: Invalid student ID format:", req.params.id);
         return res.status(400).json({ message: "Invalid student ID format" });
       }
       
-      console.log("✅ Attempting account creation for student ID:", studentId);
+      console.log("➡️ Step 1: Looking up student with ID:", studentId);
       
-      // Get the student from database 
-      // This line is critical - we need to ensure we're getting a valid student
-      // Try both available methods to get student data for maximum compatibility
-      // Simpler approach - just use the getStudent method which is confirmed to exist
-      console.log("🔍 Attempting to get student with ID:", studentId);
+      // DIRECT DATABASE ACCESS - Most reliable approach
       const student = await storage.getStudent(studentId);
+      console.log("Student lookup result:", student ? "FOUND" : "NOT FOUND");
       
       if (!student) {
-        console.error("❌ Student not found with ID:", studentId);
+        console.error("❌ CRITICAL ERROR: Student not found with ID:", studentId);
         return res.status(404).json({ message: "Student not found" });
       }
       
-      console.log("✅ Successfully retrieved student:", { 
+      console.log("✅ SUCCESS: Found student record:", { 
         id: student.id,
         fullName: student.fullName,
         guardianName: student.guardianName,
@@ -1673,25 +1675,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Check if student has an email
       if (!student.email) {
-        console.error("Student has no email:", studentId);
+        console.error("❌ VALIDATION ERROR: Student has no email:", studentId);
         return res.status(400).json({ message: "Student must have an email to create an account" });
       }
       
-      // Check if email is already registered
+      // Step 2: Check if email is already registered
+      console.log("➡️ Step 2: Checking if email is already registered:", student.email);
       const existingUser = await storage.getUserByEmail(student.email);
+      
       if (existingUser) {
-        console.log("Email already registered, linking student to existing user:", { 
+        console.log("✅ FOUND EXISTING USER - Linking student to existing user:", { 
           email: student.email, 
           userId: existingUser.id,
           studentId: student.id
         });
         
         // If user exists, associate the student with this user account
+        console.log("➡️ Step 3A: Updating existing user to link with student");
         const updatedUser = await storage.updateUser(existingUser.id, { 
           studentId: studentId 
         });
         
+        if (!updatedUser) {
+          console.error("❌ ERROR: Failed to update existing user:", existingUser.id);
+          return res.status(500).json({ message: "Failed to update existing user" });
+        }
+        
+        console.log("✅ SUCCESS: User updated successfully:", {
+          id: updatedUser.id,
+          username: updatedUser.username,
+          role: updatedUser.role
+        });
+        
         // Record the link in activity log
+        console.log("➡️ Step 4A: Logging activity");
         await storage.createActivity({
           type: 'user',
           action: 'link_student_to_account',
@@ -1702,6 +1719,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         });
         
+        console.log("✅ SUCCESS: Activity logged, returning response");
         return res.status(200).json({ 
           message: "Student linked to existing account successfully", 
           user: {
@@ -1714,6 +1732,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       
+      console.log("➡️ Step 3B: No existing user found - Creating new parent account");
       console.log("Creating new user account for student:", { 
         studentId: student.id, 
         fullName: student.fullName,
@@ -1722,41 +1741,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
       
       // Create user from student
+      console.log("➡️ Step 4B: Calling createUserFromStudent function");
       const baseUrl = `${req.protocol}://${req.get('host')}`;
-      const { user, password } = await createUserFromStudent(
-        storage, 
-        studentId, 
-        student.guardianName, 
-        student.email,
-        baseUrl
-      );
+      try {
+        const { user, password } = await createUserFromStudent(
+          storage, 
+          studentId, 
+          student.guardianName, 
+          student.email,
+          baseUrl
+        );
+        console.log("✅ SUCCESS: User creation function completed");
       
-      console.log("User account created successfully:", { 
-        userId: user.id, 
-        username: user.username, 
-        role: user.role 
-      });
-      
-      // Send welcome email with temporary password
-      const loginUrl = `${baseUrl}/login`;
-      await sendWelcomeEmail(user, password, loginUrl);
-      
-      console.log("Welcome email sent to:", user.email);
-      
-      res.status(201).json({ 
-        message: "User account created successfully",
-        user: {
-          id: user.id,
-          username: user.username,
-          email: user.email,
-          role: user.role
-        },
-        linked: false
-      });
-    } catch (error) {
-      console.error("Error creating user account from student:", error);
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      res.status(500).json({ message: "Failed to create user account", error: errorMessage });
+        console.log("User account created successfully:", { 
+          userId: user.id, 
+          username: user.username, 
+          role: user.role 
+        });
+        
+        // Send welcome email with temporary password
+        console.log("➡️ Step 5B: Sending welcome email");
+        const loginUrl = `${baseUrl}/login`;
+        await sendWelcomeEmail(user, password, loginUrl);
+        
+        console.log("✅ SUCCESS: Welcome email sent to:", user.email);
+        
+        console.log("➡️ Step 6B: Returning successful response");
+        res.status(201).json({ 
+          message: "User account created successfully",
+          user: {
+            id: user.id,
+            username: user.username,
+            email: user.email,
+            role: user.role
+          },
+          linked: false
+        });
+      } catch (error) {
+        console.error("❌ CRITICAL ERROR: Failed to create user account:", error);
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        res.status(500).json({ message: "Failed to create user account", error: errorMessage });
+      }
+    } catch (outerError) {
+      console.error("❌ OUTER ERROR in create-account endpoint:", outerError);
+      const errorMessage = outerError instanceof Error ? outerError.message : String(outerError);
+      res.status(500).json({ message: "Fatal error in account creation process", error: errorMessage });
     }
   });
 

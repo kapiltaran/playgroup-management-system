@@ -292,33 +292,53 @@ export default function Students() {
                       size="sm" 
                       onClick={async () => {
                         try {
-                          console.log("Creating parent account for student:", student.id);
+                          console.log("[CLIENT] Creating parent account for student:", student.id);
+                          toast({
+                            title: "Info",
+                            description: `Attempting to create account for ${student.guardianName}...`,
+                          });
+                          
                           const response = await fetch(`/api/students/${student.id}/create-account`, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             credentials: 'include'
                           });
                           
+                          console.log("[CLIENT] API response status:", response.status);
+                          
+                          // Get the response text first so we don't lose it if JSON parsing fails
+                          const responseText = await response.text();
+                          console.log("[CLIENT] Raw API response:", responseText);
+                          
+                          let data;
+                          try {
+                            // Try to parse the response as JSON
+                            data = JSON.parse(responseText);
+                          } catch (jsonError) {
+                            console.error("[CLIENT] Failed to parse JSON response:", jsonError);
+                            // If JSON parsing fails, use the raw text as our data
+                            data = { message: responseText };
+                          }
+                          
                           if (response.ok) {
-                            const data = await response.json();
                             toast({
                               title: "Success",
                               description: `Parent account created for ${student.guardianName} with email ${student.email}`,
                             });
                             queryClient.invalidateQueries({ queryKey: ['/api/users'] });
-                            console.log("Parent account created:", data);
+                            console.log("[CLIENT] Parent account created:", data);
                           } else {
-                            const error = await response.text();
                             toast({
                               title: "Error",
-                              description: `Failed to create parent account: ${error}`,
+                              description: `Failed to create parent account: ${data.message || data.error || responseText}`,
                               variant: "destructive",
                             });
                           }
                         } catch (error) {
+                          console.error("[CLIENT] Fatal error in create account:", error);
                           toast({
                             title: "Error",
-                            description: `Failed to create parent account: ${error}`,
+                            description: `Network error: ${error}`,
                             variant: "destructive",
                           });
                         }

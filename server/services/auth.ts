@@ -78,53 +78,74 @@ export async function createUserFromStudent(
   email: string,
   baseUrl: string
 ): Promise<{ user: User, password: string }> {
-  console.log("Creating user from student:", { studentId, fullName, email });
+  console.log("🔄 CREATING USER FROM STUDENT - FUNCTION ENTRY");
+  console.log("Input parameters:", { studentId, fullName, email, baseUrl });
   
   // Generate username from email (before the @ sign)
   const username = email.split('@')[0];
+  console.log("✅ Generated username:", username);
   
   // Use fixed password "pass123" for testing purposes
   const tempPassword = "pass123";
   const passwordHash = hashPassword(tempPassword);
+  console.log("✅ Generated password hash successfully");
   
   // Generate verification token
   const { token, expires } = generateVerificationToken();
+  console.log("✅ Generated verification token successfully");
   
-  console.log("User details prepared:", { 
+  console.log("✅ User details prepared and ready for storage:", { 
     username, 
     email, 
     fullName, 
     passwordHash: "[REDACTED]", 
     role: 'parent',
     active: true,
-    studentId 
+    studentId,
+    emailVerified: false,
+    tokenLength: token ? token.length : 0
   });
   
   try {
-    // Create user record
-    const user = await storage.createUser({
+    console.log("➡️ Attempting to create user in storage...");
+    
+    // Create user record with all required fields
+    const userInput = {
       username,
       email,
       fullName,
       passwordHash,
-      role: 'parent',
+      role: 'parent' as const, // Ensure type safety
       active: true,
       emailVerified: false,
       verificationToken: token,
       verificationTokenExpires: expires,
-      studentId
+      studentId: studentId // Ensure this is passed correctly
+    };
+    
+    console.log("User data being passed to storage:", {
+      ...userInput,
+      passwordHash: "[REDACTED]",
+      verificationToken: userInput.verificationToken ? "PRESENT" : "MISSING",
     });
     
-    console.log("User created successfully:", { 
+    const user = await storage.createUser(userInput);
+    
+    console.log("✅ STORAGE SUCCESS: User created successfully:", { 
       id: user.id, 
       username: user.username, 
       email: user.email, 
-      role: user.role 
+      role: user.role,
+      studentId: user.studentId
     });
     
     return { user, password: tempPassword };
   } catch (error) {
-    console.error("Error creating user in storage:", error);
-    throw error;
+    console.error("❌ CRITICAL ERROR in createUserFromStudent:", error);
+    if (error instanceof Error) {
+      console.error("Error details:", error.message);
+      console.error("Error stack:", error.stack);
+    }
+    throw new Error(`Failed to create user account: ${error instanceof Error ? error.message : String(error)}`);
   }
 }
