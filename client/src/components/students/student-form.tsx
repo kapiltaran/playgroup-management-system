@@ -122,11 +122,25 @@ export function StudentForm({
         
         // Create an account for the parent
         try {
-          console.log("Making API request to:", `/api/students/${result.id}/create-account`);
-          const data = await apiRequest('POST', `/api/students/${result.id}/create-account`);
-          console.log("Account creation response:", data);
+          const url = `/api/students/${result.id}/create-account`;
+          console.log("Making API request to:", url);
           
-          if (data.linked) {
+          const response = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include'
+          });
+          
+          if (!response.ok) {
+            const errorText = await response.text();
+            console.error(`Error response (${response.status}):`, errorText);
+            throw new Error(`Request failed with status ${response.status}: ${errorText}`);
+          }
+          
+          const responseData = await response.json();
+          console.log("Account creation response:", responseData);
+          
+          if (responseData.linked) {
             toast({
               title: "Student linked to existing account!",
               description: `The student has been linked to an existing account with the email ${values.email}.`,
