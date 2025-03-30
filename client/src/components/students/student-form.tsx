@@ -103,6 +103,8 @@ export function StudentForm({
       // First submit student data
       const studentData = { ...values };
       const createAccount = studentData.createAccount;
+      console.log("Form submission with createAccount:", createAccount);
+      
       // Remove createAccount as it's not part of the Student schema
       if ('createAccount' in studentData) {
         delete (studentData as any).createAccount;
@@ -110,15 +112,19 @@ export function StudentForm({
       
       // Call the regular onSubmit provided by parent component
       const result = await onSubmit(studentData);
+      console.log("Student created successfully:", result);
       
       // If createAccount is selected and we're adding a new student (not editing)
       // If result has an ID, use it for account creation
       if (createAccount && !isEditing && result?.id) {
+        console.log("Attempting to create parent account for student ID:", result.id);
         setCreatingAccount(true);
         
         // Create an account for the parent
         try {
+          console.log("Making API request to:", `/api/students/${result.id}/create-account`);
           const data = await apiRequest('POST', `/api/students/${result.id}/create-account`);
+          console.log("Account creation response:", data);
           
           if (data.linked) {
             toast({
@@ -132,14 +138,15 @@ export function StudentForm({
             });
           }
         } catch (error: any) {
+          console.error("Error creating parent account:", error);
           toast({
             title: "Failed to create account",
             description: error.message || "There was an error creating the parent account.",
             variant: "destructive",
           });
+        } finally {
+          setCreatingAccount(false);
         }
-        
-        setCreatingAccount(false);
       }
     } catch (error) {
       console.error("Error in form submission:", error);
