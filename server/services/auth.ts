@@ -78,8 +78,8 @@ export async function createUserFromStudent(
   // Generate username from email (before the @ sign)
   const username = email.split('@')[0];
   
-  // Generate a temporary password
-  const tempPassword = generateRandomPassword();
+  // Use fixed password "pass123" for testing purposes
+  const tempPassword = "pass123";
   const passwordHash = hashPassword(tempPassword);
   
   // Generate verification token
