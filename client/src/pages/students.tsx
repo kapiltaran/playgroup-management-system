@@ -105,11 +105,11 @@ export default function Students() {
     setIsDeleteDialogOpen(true);
   };
 
-  const handleSubmitStudent = (data: any) => {
+  const handleSubmitStudent = async (data: any): Promise<any> => {
     if (selectedStudent?.id) {
-      updateStudentMutation.mutate({ id: selectedStudent.id, data });
+      return updateStudentMutation.mutateAsync({ id: selectedStudent.id, data });
     } else {
-      addStudentMutation.mutate(data);
+      return addStudentMutation.mutateAsync(data);
     }
   };
 

@@ -73,6 +73,8 @@ export async function createUserFromStudent(
   email: string,
   baseUrl: string
 ): Promise<{ user: User, password: string }> {
+  console.log("Creating user from student:", { studentId, fullName, email });
+  
   // Generate username from email (before the @ sign)
   const username = email.split('@')[0];
   
@@ -83,19 +85,41 @@ export async function createUserFromStudent(
   // Generate verification token
   const { token, expires } = generateVerificationToken();
   
-  // Create user record
-  const user = await storage.createUser({
-    username,
-    email,
-    fullName,
-    passwordHash,
+  console.log("User details prepared:", { 
+    username, 
+    email, 
+    fullName, 
+    passwordHash: "[REDACTED]", 
     role: 'parent',
     active: true,
-    emailVerified: false,
-    verificationToken: token,
-    verificationTokenExpires: expires,
-    studentId
+    studentId 
   });
   
-  return { user, password: tempPassword };
+  try {
+    // Create user record
+    const user = await storage.createUser({
+      username,
+      email,
+      fullName,
+      passwordHash,
+      role: 'parent',
+      active: true,
+      emailVerified: false,
+      verificationToken: token,
+      verificationTokenExpires: expires,
+      studentId
+    });
+    
+    console.log("User created successfully:", { 
+      id: user.id, 
+      username: user.username, 
+      email: user.email, 
+      role: user.role 
+    });
+    
+    return { user, password: tempPassword };
+  } catch (error) {
+    console.error("Error creating user in storage:", error);
+    throw error;
+  }
 }
