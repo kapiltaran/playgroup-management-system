@@ -122,10 +122,8 @@ export default function Students() {
       } else {
         console.log("Creating new student");
         // We need the created student with its ID for account creation
-        result = await apiRequest("POST", "/api/students", data);
-        console.log("Direct API call result for creating student:", result);
-        // Still invalidate the queries as we would normally do
-        queryClient.invalidateQueries({ queryKey: ["/api/students"] });
+        result = await addStudentMutation.mutateAsync(data);
+        console.log("Add student mutation result:", result);
       }
       
       return result;

@@ -22,16 +22,16 @@ export function MobileNav({ items }: MobileNavProps) {
                          (item.href === "/dashboard" && location === "/");
           
           return (
-            <Link key={index} href={item.href}>
-              <a
-                className={cn(
-                  "flex flex-col items-center justify-center",
-                  isActive ? "text-primary" : "text-gray-500 hover:text-primary"
-                )}
-              >
-                {item.icon}
-                <span className="text-xs mt-1">{item.label}</span>
-              </a>
+            <Link 
+              key={index} 
+              href={item.href}
+              className={cn(
+                "flex flex-col items-center justify-center",
+                isActive ? "text-primary" : "text-gray-500 hover:text-primary"
+              )}
+            >
+              {item.icon}
+              <span className="text-xs mt-1">{item.label}</span>
             </Link>
           );
         })}

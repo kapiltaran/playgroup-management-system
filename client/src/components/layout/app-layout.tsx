@@ -97,8 +97,8 @@ export default function AppLayout({ children }: AppLayoutProps) {
             </Sheet>
             
             <div className="flex items-center ml-2 lg:ml-0">
-              <Link href="/dashboard">
-                <a className="text-primary font-bold text-xl">PlayGroup Manager</a>
+              <Link href="/dashboard" className="text-primary font-bold text-xl">
+                PlayGroup Manager
               </Link>
             </div>
           </div>

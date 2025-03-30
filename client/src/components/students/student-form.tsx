@@ -113,28 +113,14 @@ export function StudentForm({
       
       let studentId: number;
       
-      // We'll use direct API calls instead of relying on the mutation to ensure we get proper data back
+      // Use the parent's onSubmit function which will use the proper mutation
       if (isEditing && defaultValues?.id) {
         // Handle editing existing student
         console.log("Updating existing student:", defaultValues.id);
         try {
-          const response = await fetch(`/api/students/${defaultValues.id}`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(studentData),
-            credentials: 'include'
-          });
-          
-          if (!response.ok) {
-            const errorText = await response.text();
-            throw new Error(`Failed to update student: ${errorText}`);
-          }
-          
-          const updatedStudent = await response.json();
+          // We use the parent component's mutation through onSubmit
+          const updatedStudent = await onSubmit(studentData);
           console.log("Updated student result:", updatedStudent);
-          
-          // Still call the parent's onSubmit function for state updates
-          await onSubmit(studentData);
           
           // No need to create account when editing
           return;
@@ -143,31 +129,14 @@ export function StudentForm({
           throw error;
         }
       } else {
-        // Create new student with direct API call
-        console.log("Creating new student with direct API call");
+        // Create new student through parent's handler that uses mutation
+        console.log("Creating new student");
         
         try {
-          const response = await fetch('/api/students', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(studentData),
-            credentials: 'include'
-          });
-          
-          if (!response.ok) {
-            const errorText = await response.text();
-            throw new Error(`Failed to create student: ${errorText}`);
-          }
-          
-          const newStudent = await response.json();
+          // Use the parent component's mutation through onSubmit
+          const newStudent = await onSubmit(studentData);
           console.log("New student created:", newStudent);
           studentId = newStudent.id;
-          
-          // Still call parent onSubmit for state updates
-          await onSubmit(studentData);
-          
-          // Invalidate students query to refresh the list
-          queryClient.invalidateQueries({ queryKey: ['/api/students'] });
           
           if (!createAccount) {
             toast({

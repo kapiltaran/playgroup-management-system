@@ -107,25 +107,25 @@ export default function Sidebar({ setOpen }: SidebarProps) {
                            (item.href === "/dashboard" && location === "/");
             
             return (
-              <Link key={index} href={item.href}>
-                <a
+              <Link 
+                key={index} 
+                href={item.href}
+                className={cn(
+                  "flex items-center px-3 py-2 text-sm font-medium rounded-md",
+                  isActive
+                    ? "bg-primary text-white"
+                    : "text-gray-700 hover:bg-gray-100"
+                )}
+                onClick={handleClick}
+              >
+                <span
                   className={cn(
-                    "flex items-center px-3 py-2 text-sm font-medium rounded-md",
-                    isActive
-                      ? "bg-primary text-white"
-                      : "text-gray-700 hover:bg-gray-100"
+                    isActive ? "text-white" : "text-gray-500"
                   )}
-                  onClick={handleClick}
                 >
-                  <span
-                    className={cn(
-                      isActive ? "text-white" : "text-gray-500"
-                    )}
-                  >
-                    {item.icon}
-                  </span>
-                  {item.label}
-                </a>
+                  {item.icon}
+                </span>
+                {item.label}
               </Link>
             );
           })}
