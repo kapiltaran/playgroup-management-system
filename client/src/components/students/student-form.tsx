@@ -35,7 +35,9 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
 import { queryClient } from "@/lib/queryClient";
+// Import and log to verify it's working
 import { createParentAccount } from "./utils/create-parent-account";
+console.log("✅ IMPORTED createParentAccount function:", typeof createParentAccount, createParentAccount);
 
 const formSchema = insertStudentSchema.extend({
   fullName: z.string().min(2, "Full name must be at least 2 characters"),
@@ -105,6 +107,7 @@ export function StudentForm({
       // First submit student data
       const studentData = { ...values };
       const createAccount = studentData.createAccount;
+      console.log("\n\n🚨🚨🚨 STUDENT FORM SUBMISSION 🚨🚨🚨");
       console.log("🔴 CRITICAL DEBUG - Form submission with createAccount:", createAccount);
       console.log("🔴 CRITICAL DEBUG - Form values:", JSON.stringify(values, null, 2));
       
@@ -220,8 +223,12 @@ export function StudentForm({
             }
             
             // Use our dedicated utility function for parent account creation
+            console.log("▶️▶️▶️ ABOUT TO CALL createParentAccount with studentId:", studentId);
+            
+            // Direct invocation with logging
             const result = await createParentAccount(studentId);
             
+            console.log("◀️◀️◀️ RETURNED FROM createParentAccount");
             console.log("Parent account creation result:", result);
             
             if (!result.success) {
@@ -519,7 +526,10 @@ export function StudentForm({
                         <FormControl>
                           <Checkbox
                             checked={field.value}
-                            onCheckedChange={field.onChange}
+                            onCheckedChange={(checked) => {
+                              console.log("🔍 Checkbox changed to:", checked);
+                              field.onChange(checked);
+                            }}
                           />
                         </FormControl>
                         <div className="space-y-1 leading-none">

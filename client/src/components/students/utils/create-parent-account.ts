@@ -23,6 +23,7 @@ interface CreateParentAccountResponse {
 export async function createParentAccount(
   studentId: number
 ): Promise<CreateParentAccountResponse> {
+  console.log(`\n\n🚨🚨🚨 CREATE PARENT ACCOUNT FUNCTION CALLED 🚨🚨🚨`);
   console.log(`🔍 CREATE PARENT ACCOUNT: Starting for student ID ${studentId}`);
   
   try {
@@ -34,7 +35,7 @@ export async function createParentAccount(
       };
     }
     
-    console.log(`✅ CREATE PARENT ACCOUNT: Valid student ID ${studentId}, making API request`);
+    console.log(`✅ CREATE PARENT ACCOUNT: Valid student ID ${studentId}, making API request to /api/students/${studentId}/create-account`);
     
     // Use the fetch API directly for more control over the response handling
     const response = await fetch(`/api/students/${studentId}/create-account`, {
