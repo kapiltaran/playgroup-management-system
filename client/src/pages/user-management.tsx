@@ -503,8 +503,8 @@ export default function UserManagement() {
                           <FormItem>
                             <FormLabel>Associated Student</FormLabel>
                             <Select
-                              onValueChange={(value) => field.onChange(value ? parseInt(value) : null)}
-                              value={field.value?.toString() || ""}
+                              onValueChange={(value) => field.onChange(value === "none" ? null : parseInt(value))}
+                              value={field.value?.toString() || "none"}
                             >
                               <FormControl>
                                 <SelectTrigger>
@@ -512,7 +512,7 @@ export default function UserManagement() {
                                 </SelectTrigger>
                               </FormControl>
                               <SelectContent>
-                                <SelectItem value="">None</SelectItem>
+                                <SelectItem value="none">None</SelectItem>
                                 {students?.map(student => (
                                   <SelectItem key={student.id} value={student.id.toString()}>
                                     {student.fullName}
@@ -764,8 +764,8 @@ export default function UserManagement() {
                         <FormItem>
                           <FormLabel>Associated Student</FormLabel>
                           <Select
-                            onValueChange={(value) => field.onChange(value ? parseInt(value) : null)}
-                            value={field.value?.toString() || ""}
+                            onValueChange={(value) => field.onChange(value === "none" ? null : parseInt(value))}
+                            value={field.value?.toString() || "none"}
                           >
                             <FormControl>
                               <SelectTrigger>
@@ -773,7 +773,7 @@ export default function UserManagement() {
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
-                              <SelectItem value="">None</SelectItem>
+                              <SelectItem value="none">None</SelectItem>
                               {students?.map(student => (
                                 <SelectItem key={student.id} value={student.id.toString()}>
                                   {student.fullName}
