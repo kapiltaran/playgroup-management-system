@@ -463,37 +463,50 @@ export class MemStorage implements IStorage {
       return [];
     }
 
-    console.log(`Finding students for parent user ID ${userId}, username: ${user.username}, email: ${user.email}, linked student: ${user.studentId}`);
+    console.log(`🔍 Finding students for parent user ID ${userId}, username: ${user.username}, email: ${user.email}, linked student: ${user.studentId}`);
 
     // For parents, we only return students linked to their account
     const allStudents = Array.from(this.students.values());
     console.log(`Total students in system: ${allStudents.length}`);
     
+    // Keep track of matched student IDs to avoid duplicates
+    const matchedStudentIds = new Set<number>();
+    
     const matchingStudents = allStudents.filter(student => {
-      console.log(`Checking student ${student.id} (${student.fullName}), email: ${student.email}`);
+      // Skip if already matched
+      if (matchedStudentIds.has(student.id)) {
+        return true;
+      }
       
-      // Check if the student is linked to this parent user
+      console.log(`Checking student ${student.id} (${student.fullName}), email: ${student.email || 'none'}`);
+      
+      // Check if the student is linked to this parent user via studentId
       if (user.studentId && user.studentId === student.id) {
         console.log(`✅ MATCH: Student ${student.id} (${student.fullName}) matches parent's studentId: ${user.studentId}`);
+        matchedStudentIds.add(student.id);
         return true;
       }
       
-      // Also check if the student has the same email as the parent
-      // This allows parents to see all their children
+      // Check if the parent's email matches the student's email
       if (student.email && user.email && student.email.toLowerCase() === user.email.toLowerCase()) {
         console.log(`✅ MATCH: Student ${student.id} (${student.fullName}) email matches parent's email: ${user.email}`);
+        matchedStudentIds.add(student.id);
         return true;
       }
-
-      // Special case for test user emily.parent which has email john.smith@example.com
-      if (user.username === 'emily.parent' && student.email === 'john.smith@example.com') {
-        console.log(`✅ MATCH: Special case for test user emily.parent matched with student ${student.id} (${student.fullName})`);
+      
+      // Special case for test users - match by guardian email
+      // For real applications, we would probably have a more robust parent-student relationship table
+      if (user.email && student.email && user.email.toLowerCase() === student.email.toLowerCase()) {
+        console.log(`✅ MATCH: Parent email ${user.email} matches student ${student.id} (${student.fullName}) email ${student.email}`);
+        matchedStudentIds.add(student.id);
         return true;
       }
         
-        return false;
-      })
-      .sort((a, b) => b.id - a.id);
+      return false;
+    });
+    
+    console.log(`Found ${matchingStudents.length} students for parent ${user.username} (ID: ${userId})`);
+    return matchingStudents.sort((a, b) => b.id - a.id);
   }
 
   async getStudent(id: number): Promise<Student | undefined> {
