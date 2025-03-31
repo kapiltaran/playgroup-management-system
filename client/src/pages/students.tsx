@@ -67,8 +67,20 @@ export default function Students() {
           
           console.log("🔴 Parent account creation status:", accountResponse.status);
           
+          const responseText = await accountResponse.text();
+          console.log("🔴 Raw API response:", responseText);
+          
+          let accountData;
+          try {
+            // Try to parse the response as JSON
+            accountData = JSON.parse(responseText);
+          } catch (jsonError) {
+            console.error("🔴 Failed to parse JSON response:", jsonError);
+            // If JSON parsing fails, use the raw text as our data
+            accountData = { message: responseText };
+          }
+          
           if (accountResponse.ok) {
-            const accountData = await accountResponse.json();
             console.log("🔴 Parent account created successfully:", accountData);
             // Invalidate users query to refresh listings
             queryClient.invalidateQueries({ queryKey: ['/api/users'] });
@@ -77,16 +89,20 @@ export default function Students() {
               description: `Account created for ${studentData.guardianName} with email ${studentData.email}`,
             });
           } else {
-            const errorText = await accountResponse.text();
-            console.error("🔴 Error creating parent account:", errorText);
+            console.error("🔴 Error creating parent account:", accountData);
             toast({
               title: "Parent Account Creation Failed",
-              description: `Could not create account: ${errorText}`,
+              description: `Could not create account: ${accountData.message || accountData.error || responseText}`,
               variant: "destructive"
             });
           }
         } catch (accountError) {
           console.error("🔴 Exception creating parent account:", accountError);
+          toast({
+            title: "Error",
+            description: `Network error creating parent account: ${accountError}`,
+            variant: "destructive"
+          });
         }
       }
       
@@ -239,7 +255,7 @@ export default function Students() {
             {
               accessorKey: "fullName",
               header: "Name",
-              cell: (student) => (
+              cell: (student: any) => (
                 <div className="flex items-center">
                   <Avatar className="h-10 w-10 bg-gray-200 text-gray-500">
                     <AvatarFallback>
@@ -256,14 +272,14 @@ export default function Students() {
             {
               accessorKey: "age",
               header: "Age",
-              cell: (student) => (
+              cell: (student: any) => (
                 <div className="text-sm text-gray-900">{student.age} years</div>
               )
             },
             {
               accessorKey: "guardianName",
               header: "Guardian",
-              cell: (student) => (
+              cell: (student: any) => (
                 <>
                   <div className="text-sm text-gray-900">{student.guardianName}</div>
                   <div className="text-sm text-gray-500">{student.phone}</div>
@@ -273,13 +289,13 @@ export default function Students() {
             {
               accessorKey: "status",
               header: "Status",
-              cell: (student) => renderStatusBadge(student.status)
+              cell: (student: any) => renderStatusBadge(student.status)
             },
             ...(isParent ? [] : [
               {
                 accessorKey: "id",
                 header: "Actions",
-                cell: (student) => (
+                cell: (student: any) => (
                   <div className="flex space-x-2">
                     <Button variant="outline" size="sm" onClick={() => handleEditStudent(student)}>
                       <PencilIcon className="h-4 w-4" />
@@ -359,7 +375,10 @@ export default function Students() {
         isOpen={isStudentFormOpen}
         onClose={() => setIsStudentFormOpen(false)}
         onSubmit={handleSubmitStudent}
-        defaultValues={selectedStudent || undefined}
+        defaultValues={selectedStudent ? {
+          ...selectedStudent,
+          gender: selectedStudent.gender as "male" | "female" | "other"
+        } : undefined}
         isSubmitting={addStudentMutation.isPending || updateStudentMutation.isPending}
       />
 
