@@ -1188,6 +1188,31 @@ export class MemStorage implements IStorage {
     mfaEnabled?: boolean,
     mfaSecret?: string | null
   }): Promise<User> {
+    console.log("🔹 STORAGE - createUser called with:", {
+      ...userData,
+      passwordHash: "REDACTED", // Don't log sensitive information
+      studentId: userData.studentId || null,
+      emailVerified: userData.emailVerified || false,
+      hasVerificationToken: !!userData.verificationToken,
+      hasVerificationTokenExpires: !!userData.verificationTokenExpires
+    });
+    
+    // Check if user with the same email exists
+    try {
+      const existingByEmail = await this.getUserByEmail(userData.email);
+      if (existingByEmail) {
+        console.log("🔸 WARNING: User with this email already exists:", existingByEmail.email);
+      }
+      
+      // Check if user with the same username exists
+      const existingByUsername = await this.getUserByUsername(userData.username);
+      if (existingByUsername) {
+        console.log("🔸 WARNING: User with this username already exists:", existingByUsername.username);
+      }
+    } catch (error) {
+      console.error("🔻 ERROR checking existing users:", error);
+    }
+    
     const id = this.userId++;
     const now = new Date();
     const user: User = {

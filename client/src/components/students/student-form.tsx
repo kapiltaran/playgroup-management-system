@@ -107,6 +107,16 @@ export function StudentForm({
       console.log("🔴 CRITICAL DEBUG - Form submission with createAccount:", createAccount);
       console.log("🔴 CRITICAL DEBUG - Form values:", JSON.stringify(values, null, 2));
       
+      // Log form field state and errors
+      console.log("🔴 CRITICAL DEBUG - Form state:", JSON.stringify({
+        isDirty: form.formState.isDirty,
+        dirtyFields: form.formState.dirtyFields,
+        isSubmitted: form.formState.isSubmitted,
+        isSubmitting: form.formState.isSubmitting,
+        isValid: form.formState.isValid,
+        errors: form.formState.errors
+      }, null, 2));
+      
       // Remove createAccount as it's not part of the Student schema
       if ('createAccount' in studentData) {
         delete (studentData as any).createAccount;
@@ -560,6 +570,27 @@ export function StudentForm({
                   onClick={onClose}
                 >
                   Cancel
+                </Button>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={() => {
+                    console.log("DEBUG - Current form values:", form.getValues());
+                    console.log("DEBUG - Form state:", {
+                      isDirty: form.formState.isDirty,
+                      dirtyFields: form.formState.dirtyFields,
+                      isSubmitted: form.formState.isSubmitted,
+                      isValid: form.formState.isValid,
+                      errors: form.formState.errors
+                    });
+                    const values = form.getValues();
+                    toast({
+                      title: "Form Debug",
+                      description: `Create Account: ${values.createAccount ? "YES" : "NO"}`
+                    });
+                  }}
+                >
+                  Debug Form
                 </Button>
                 <Button
                   type="submit"

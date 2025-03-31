@@ -377,7 +377,14 @@ export default function Students() {
         onSubmit={handleSubmitStudent}
         defaultValues={selectedStudent ? {
           ...selectedStudent,
-          gender: selectedStudent.gender as "male" | "female" | "other"
+          gender: selectedStudent.gender as "male" | "female" | "other",
+          status: selectedStudent.status as "active" | "inactive" | "on_leave",
+          city: selectedStudent.city || undefined,
+          postalCode: selectedStudent.postalCode || undefined,
+          state: selectedStudent.state || undefined,
+          country: selectedStudent.country || undefined,
+          address: selectedStudent.address || undefined,
+          notes: selectedStudent.notes || undefined
         } : undefined}
         isSubmitting={addStudentMutation.isPending || updateStudentMutation.isPending}
       />
