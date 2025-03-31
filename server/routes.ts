@@ -148,13 +148,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // If there's a logged-in user and they are a parent, only show their students
       if (user && user.role === 'parent') {
-        console.log(`Filtering students for parent user ID: ${user.id}`);
+        console.log(`🔍 Filtering students for parent user ID: ${user.id}, username: ${user.username}`);
         const students = await storage.getStudentsByParent(user.id);
+        console.log(`✅ Found ${students.length} students for parent ${user.username}`);
         return res.json(students);
       }
       
       // For all other cases (admin, teacher, etc.), show all students
+      console.log(`Getting all students for role: ${user?.role || 'unknown'}`);
       const students = await storage.getStudents();
+      console.log(`Total students returned: ${students.length}`);
       res.json(students);
     } catch (error) {
       console.error("Error fetching students:", error);
