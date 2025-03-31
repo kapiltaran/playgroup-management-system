@@ -149,48 +149,45 @@ export function StudentForm({
         
         try {
           // Use the parent component's mutation through onSubmit
+          // Call the mutation function to create the student
+          console.log("Calling onSubmit to create new student...");
           const newStudent = await onSubmit(studentData);
           console.log("New student created:", newStudent);
           
-          // This part is critical - get the ID directly from the API response data
-          // not relying on the returned object which might be transformed by TanStack Query
+          // There's an issue with the student creation response
+          // Let's do a reliable check and get the student ID
+          let studentId: number;
           
-          // If we get a non-object response
-          if (!newStudent || typeof newStudent !== 'object') {
-            console.error("Invalid student creation response:", newStudent);
-            throw new Error("Student creation failed - invalid response");
-          }
-          
-          if (!newStudent.id) {
-            // Try to get the student we just created by querying the API
-            console.log("Student created but ID missing, fetching latest student");
-            const response = await fetch("/api/students");
-            const latestStudents = await response.json();
-            console.log("All students:", latestStudents);
-            
-            if (Array.isArray(latestStudents) && latestStudents.length > 0) {
-              // Find the matching student by checking all fields
-              const matchingStudent = latestStudents.find(s => 
-                s.fullName === studentData.fullName && 
-                s.email === studentData.email && 
-                s.guardianName === studentData.guardianName
-              );
-              
-              if (matchingStudent) {
-                console.log("Found matching student:", matchingStudent);
-                studentId = matchingStudent.id;
-              } else {
-                // Use the last created student as fallback
-                const lastStudent = latestStudents[latestStudents.length - 1];
-                console.log("Using last created student:", lastStudent);
-                studentId = lastStudent.id;
-              }
-            } else {
-              throw new Error("Failed to retrieve student ID after creation");
-            }
-          } else {
-            console.log("New student ID direct from response:", newStudent.id);
+          // First check if we have a proper response with an ID
+          if (newStudent && typeof newStudent === 'object' && newStudent.id) {
+            console.log("Got student ID directly from response:", newStudent.id);
             studentId = newStudent.id;
+          } else {
+            // If we don't have an ID, make a direct API call to get the latest student
+            console.log("Student ID not in response, fetching latest student...");
+            
+            // Get all students
+            const response = await fetch("/api/students");
+            const students = await response.json();
+            
+            // Find the student we just created by matching fields
+            const matchingStudent = students.find(s => 
+              s.fullName === studentData.fullName && 
+              s.email === studentData.email && 
+              s.guardianName === studentData.guardianName
+            );
+            
+            if (matchingStudent) {
+              console.log("Found matching student:", matchingStudent);
+              studentId = matchingStudent.id;
+            } else if (students.length > 0) {
+              // Fallback to the most recently added student (likely our newly created one)
+              const latestStudent = students[students.length - 1];
+              console.log("Using latest student as fallback:", latestStudent);
+              studentId = latestStudent.id;
+            } else {
+              throw new Error("Could not find student ID after creation");
+            }
           }
           
           // Extra validation
@@ -222,18 +219,25 @@ export function StudentForm({
               throw new Error("Student ID is undefined. Cannot create parent account.");
             }
             
-            // Use our dedicated utility function for parent account creation
-            console.log("▶️▶️▶️ ABOUT TO CALL createParentAccount with studentId:", studentId);
+            // Make a direct API call - simpler and more reliable
+            console.log("▶️▶️▶️ MAKING DIRECT API CALL to create parent account with studentId:", studentId);
             
-            // Direct invocation with logging
-            const result = await createParentAccount(studentId);
+            const response = await fetch(`/api/students/${studentId}/create-account`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              credentials: 'include'
+            });
             
-            console.log("◀️◀️◀️ RETURNED FROM createParentAccount");
-            console.log("Parent account creation result:", result);
+            console.log(`◀️◀️◀️ API RESPONSE STATUS: ${response.status}`);
             
-            if (!result.success) {
-              throw new Error(result.message || result.error || "Failed to create parent account");
+            if (!response.ok) {
+              const errorData = await response.json();
+              console.error("Parent account creation failed:", errorData);
+              throw new Error(errorData.message || "Failed to create parent account");
             }
+            
+            const result = await response.json();
+            console.log("Parent account creation result:", result);
             
             // Invalidate the users cache to refresh the user management page
             queryClient.invalidateQueries({ queryKey: ['/api/users'] });
