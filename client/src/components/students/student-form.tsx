@@ -126,7 +126,8 @@ export function StudentForm({
         delete (studentData as any).createAccount;
       }
       
-      let studentId: number;
+      // Declare student ID variable at this level for proper scope
+      let studentId: number | undefined;
       
       // Use the parent's onSubmit function which will use the proper mutation
       if (isEditing && defaultValues?.id) {
@@ -156,7 +157,6 @@ export function StudentForm({
           
           // There's an issue with the student creation response
           // Let's do a reliable check and get the student ID
-          let studentId: number;
           
           // First check if we have a proper response with an ID
           if (newStudent && typeof newStudent === 'object' && newStudent.id) {
@@ -171,7 +171,7 @@ export function StudentForm({
             const students = await response.json();
             
             // Find the student we just created by matching fields
-            const matchingStudent = students.find(s => 
+            const matchingStudent = students.find((s: any) => 
               s.fullName === studentData.fullName && 
               s.email === studentData.email && 
               s.guardianName === studentData.guardianName
@@ -210,11 +210,12 @@ export function StudentForm({
         }
         
         // Handle parent account creation if needed
-        if (createAccount) {
+        if (createAccount && studentId) {
           console.log("Creating parent account for student ID:", studentId);
           setCreatingAccount(true);
           
           try {
+            // Redundant check but TypeScript needs it
             if (!studentId) {
               throw new Error("Student ID is undefined. Cannot create parent account.");
             }
