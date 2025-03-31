@@ -213,25 +213,33 @@ export function StudentForm({
           setCreatingAccount(true);
           
           try {
-            // Make a direct API call instead of using the imported function
-            console.log("Making direct API call to create parent account for student ID:", studentId);
-            
             if (!studentId) {
               throw new Error("Student ID is undefined. Cannot create parent account.");
             }
             
-            // Use apiRequest for more consistent error handling
-            console.log("Using apiRequest to create parent account for student ID:", studentId);
-            const accountData = await apiRequest(
-              "POST", 
-              `/api/students/${studentId}/create-account`,
-              null // No body needed, studentId is in the URL
-            );
-            
-            console.log("Parent account creation successful:", accountData);
-            
-            // Invalidate the users cache to refresh the user management page
-            queryClient.invalidateQueries({ queryKey: ['/api/users'] });
+            try {
+              // Use apiRequest for more consistent error handling
+              const response = await fetch(`/api/students/${studentId}/create-account`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json'
+                }
+              });
+              
+              if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.message || "Failed to create parent account");
+              }
+              
+              const accountData = await response.json();
+              console.log("Parent account creation successful:", accountData);
+              
+              // Invalidate the users cache to refresh the user management page
+              queryClient.invalidateQueries({ queryKey: ['/api/users'] });
+            } catch (error) {
+              console.error("Error in API call:", error);
+              throw error; // Re-throw to be caught by outer catch block
+            }
             
             toast({
               title: "Account created successfully!",
