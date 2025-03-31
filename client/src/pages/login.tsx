@@ -35,6 +35,16 @@ export default function LoginPage() {
       password: "",
     },
   });
+  
+  // Function to automatically fill credentials and submit
+  const loginWithCredentials = (username: string, password: string) => {
+    form.setValue("username", username);
+    form.setValue("password", password);
+    // Submit the form programmatically after a short delay
+    setTimeout(() => {
+      form.handleSubmit(onSubmit)();
+    }, 100);
+  };
 
   async function onSubmit(values: LoginFormValues) {
     setIsLoading(true);
@@ -139,25 +149,37 @@ export default function LoginPage() {
         </CardContent>
         <CardFooter className="flex flex-col gap-2 text-center text-sm">
           <div className="w-full border-t pt-2">
-            <p className="text-muted-foreground mb-2">Sample Accounts:</p>
+            <p className="text-muted-foreground mb-2">Sample Accounts (Click to Login):</p>
             <div className="grid grid-cols-2 gap-2 text-xs">
-              <div className="border rounded-md p-1">
-                <p className="font-medium">Superadmin</p>
+              <div 
+                className="border rounded-md p-2 hover:bg-primary/10 cursor-pointer transition-colors"
+                onClick={() => loginWithCredentials("admin", "admin123")}
+              >
+                <p className="font-medium text-primary">Superadmin</p>
                 <p>Username: admin</p>
                 <p>Password: admin123</p>
               </div>
-              <div className="border rounded-md p-1">
-                <p className="font-medium">Teacher</p>
+              <div 
+                className="border rounded-md p-2 hover:bg-primary/10 cursor-pointer transition-colors"
+                onClick={() => loginWithCredentials("john.teacher", "teacher123")}
+              >
+                <p className="font-medium text-primary">Teacher</p>
                 <p>Username: john.teacher</p>
                 <p>Password: teacher123</p>
               </div>
-              <div className="border rounded-md p-1">
-                <p className="font-medium">Office Admin</p>
+              <div 
+                className="border rounded-md p-2 hover:bg-primary/10 cursor-pointer transition-colors"
+                onClick={() => loginWithCredentials("sarah.admin", "admin123")}
+              >
+                <p className="font-medium text-primary">Office Admin</p>
                 <p>Username: sarah.admin</p>
                 <p>Password: admin123</p>
               </div>
-              <div className="border rounded-md p-1">
-                <p className="font-medium">Parent</p>
+              <div 
+                className="border rounded-md p-2 hover:bg-primary/10 cursor-pointer transition-colors"
+                onClick={() => loginWithCredentials("emily.parent", "parent123")}
+              >
+                <p className="font-medium text-primary">Parent</p>
                 <p>Username: emily.parent</p>
                 <p>Password: parent123</p>
               </div>
