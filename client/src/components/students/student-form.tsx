@@ -220,45 +220,23 @@ export function StudentForm({
               throw new Error("Student ID is undefined. Cannot create parent account.");
             }
             
-            // Direct API call to create parent account
-            const accountResponse = await fetch(`/api/students/${studentId}/create-account`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              credentials: 'include'
+            // Use apiRequest for more consistent error handling
+            console.log("Using apiRequest to create parent account for student ID:", studentId);
+            const accountData = await apiRequest(
+              "POST", 
+              `/api/students/${studentId}/create-account`,
+              null // No body needed, studentId is in the URL
+            );
+            
+            console.log("Parent account creation successful:", accountData);
+            
+            // Invalidate the users cache to refresh the user management page
+            queryClient.invalidateQueries({ queryKey: ['/api/users'] });
+            
+            toast({
+              title: "Account created successfully!",
+              description: `A parent account has been created for ${values.guardianName} with the email ${values.email}. A welcome email with login instructions has been sent.`,
             });
-            
-            console.log("Parent account creation status:", accountResponse.status);
-            
-            const responseText = await accountResponse.text();
-            console.log("Raw API response:", responseText);
-            
-            let accountData;
-            try {
-              // Try to parse the response as JSON
-              accountData = JSON.parse(responseText);
-            } catch (jsonError) {
-              console.error("Failed to parse JSON response:", jsonError);
-              // If JSON parsing fails, use the raw text as our data
-              accountData = { message: responseText };
-            }
-            
-            if (accountResponse.ok) {
-              console.log("Parent account created successfully:", accountData);
-              // Invalidate the users cache to refresh the user management page
-              queryClient.invalidateQueries({ queryKey: ['/api/users'] });
-              
-              toast({
-                title: "Account created successfully!",
-                description: `A parent account has been created for ${values.guardianName} with the email ${values.email}. A welcome email with login instructions has been sent.`,
-              });
-            } else {
-              console.error("Error creating parent account:", accountData);
-              toast({
-                title: "Failed to create account",
-                description: accountData.message || "There was an error creating the parent account.",
-                variant: "destructive",
-              });
-            }
           } catch (error: any) {
             console.error("Error creating parent account:", error);
             toast({
