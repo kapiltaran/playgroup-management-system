@@ -1,6 +1,7 @@
 import { createContext, ReactNode, useContext, useEffect, useState } from 'react';
 import { useLocation } from 'wouter';
 import { useToast } from '@/hooks/use-toast';
+import { queryClient } from '@/lib/queryClient';
 
 interface User {
   id: number;
@@ -95,6 +96,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const login = (userData: User) => {
+    // Clear any existing cached data from previous user sessions
+    console.log("🧹 Clearing query cache on login");
+    queryClient.clear();
+    
     sessionStorage.setItem('user', JSON.stringify(userData));
     setUser(userData);
     setIsAuthenticated(true);
@@ -112,6 +117,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
       
       if (response.ok) {
+        // Clear React Query cache to ensure fresh data on next login
+        console.log("🧹 Clearing query cache on logout");
+        queryClient.clear();
+        
         sessionStorage.removeItem('user');
         setUser(null);
         setIsAuthenticated(false);
@@ -136,7 +145,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         variant: "destructive",
       });
     } finally {
-      // Even if server logout fails, clear local state
+      // Even if server logout fails, clear local state and cache
+      console.log("🧹 Clearing query cache in finally block");
+      queryClient.clear();
+      
       sessionStorage.removeItem('user');
       setUser(null);
       setIsAuthenticated(false);
