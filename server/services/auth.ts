@@ -78,8 +78,25 @@ export async function createUserFromStudent(
   email: string,
   baseUrl: string
 ): Promise<{ user: User, password: string }> {
+  console.log("\n\n🚨🚨🚨 CREATEUSERFROMSTUDENT FUNCTION CALLED 🚨🚨🚨");
   console.log("🔄 CREATING USER FROM STUDENT - FUNCTION ENTRY");
   console.log("Input parameters:", { studentId, fullName, email, baseUrl });
+  
+  // Validate parameters
+  if (!studentId || isNaN(studentId)) {
+    console.error("❌ CRITICAL ERROR: Invalid studentId:", studentId);
+    throw new Error(`Invalid studentId: ${studentId}`);
+  }
+  
+  if (!fullName || fullName.trim() === "") {
+    console.error("❌ CRITICAL ERROR: Missing fullName");
+    throw new Error("Guardian name is required to create a parent account");
+  }
+  
+  if (!email || !email.includes("@")) {
+    console.error("❌ CRITICAL ERROR: Invalid email:", email);
+    throw new Error(`Invalid email address: ${email}`);
+  }
   
   // Generate username from email (before the @ sign)
   const username = email.split('@')[0];

@@ -1188,7 +1188,8 @@ export class MemStorage implements IStorage {
     mfaEnabled?: boolean,
     mfaSecret?: string | null
   }): Promise<User> {
-    console.log("🔹 STORAGE - createUser called with:", {
+    console.log("\n\n🚨🚨🚨 STORAGE - createUser called 🚨🚨🚨");
+    console.log("🔹 User data:", {
       ...userData,
       passwordHash: "REDACTED", // Don't log sensitive information
       studentId: userData.studentId || null,
