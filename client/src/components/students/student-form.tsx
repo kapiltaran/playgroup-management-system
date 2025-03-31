@@ -170,23 +170,14 @@ export function StudentForm({
             const response = await fetch("/api/students");
             const students = await response.json();
             
-            // Find the student we just created by matching fields
-            const matchingStudent = students.find((s: any) => 
-              s.fullName === studentData.fullName && 
-              s.email === studentData.email && 
-              s.guardianName === studentData.guardianName
-            );
-            
-            if (matchingStudent) {
-              console.log("Found matching student:", matchingStudent);
-              studentId = matchingStudent.id;
-            } else if (students.length > 0) {
-              // Fallback to the most recently added student (likely our newly created one)
-              const latestStudent = students[students.length - 1];
-              console.log("Using latest student as fallback:", latestStudent);
+            // Because the API returns newest students first, the first student is the one we just created
+            if (students.length > 0) {
+              // The first student in the array is the most recently created one (newest first)
+              const latestStudent = students[0];
+              console.log("Using first student in list as it's the most recent:", latestStudent);
               studentId = latestStudent.id;
             } else {
-              throw new Error("Could not find student ID after creation");
+              throw new Error("Could not find any students after creation");
             }
           }
           
