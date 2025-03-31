@@ -34,7 +34,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { queryClient } from "@/lib/queryClient";
+import { createParentAccount } from "./utils/create-parent-account";
 
 const formSchema = insertStudentSchema.extend({
   fullName: z.string().min(2, "Full name must be at least 2 characters"),
@@ -160,7 +161,8 @@ export function StudentForm({
           if (!newStudent.id) {
             // Try to get the student we just created by querying the API
             console.log("Student created but ID missing, fetching latest student");
-            const latestStudents = await apiRequest("GET", "/api/students", null);
+            const response = await fetch("/api/students");
+            const latestStudents = await response.json();
             console.log("All students:", latestStudents);
             
             if (Array.isArray(latestStudents) && latestStudents.length > 0) {
@@ -217,29 +219,17 @@ export function StudentForm({
               throw new Error("Student ID is undefined. Cannot create parent account.");
             }
             
-            try {
-              // Use apiRequest for more consistent error handling
-              const response = await fetch(`/api/students/${studentId}/create-account`, {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json'
-                }
-              });
-              
-              if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.message || "Failed to create parent account");
-              }
-              
-              const accountData = await response.json();
-              console.log("Parent account creation successful:", accountData);
-              
-              // Invalidate the users cache to refresh the user management page
-              queryClient.invalidateQueries({ queryKey: ['/api/users'] });
-            } catch (error) {
-              console.error("Error in API call:", error);
-              throw error; // Re-throw to be caught by outer catch block
+            // Use our dedicated utility function for parent account creation
+            const result = await createParentAccount(studentId);
+            
+            console.log("Parent account creation result:", result);
+            
+            if (!result.success) {
+              throw new Error(result.message || result.error || "Failed to create parent account");
             }
+            
+            // Invalidate the users cache to refresh the user management page
+            queryClient.invalidateQueries({ queryKey: ['/api/users'] });
             
             toast({
               title: "Account created successfully!",
