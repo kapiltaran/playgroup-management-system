@@ -28,6 +28,20 @@ export default function Classes() {
   // Fetch classes
   const { data: classes, isLoading } = useQuery<Class[]>({
     queryKey: ["/api/classes"],
+    queryFn: async () => {
+      // Force an authenticated request to the server
+      const response = await fetch('/api/classes', {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include'
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Error ${response.status}: ${response.statusText}`);
+      }
+      
+      return response.json();
+    }
   });
 
   // Add class mutation

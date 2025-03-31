@@ -12,8 +12,14 @@ export async function apiRequest<T = any>(
   url: string, 
   data?: unknown | undefined
 ): Promise<T> {
-  // Ensure URL is absolute with leading slash
+  // Ensure URL is absolute with leading slash and prevent any accidental https://replit.com URLs
   const fullUrl = url.startsWith('/') ? url : `/${url}`;
+  
+  // Ensure we're not accidentally using the full replit.com domain
+  if (fullUrl.includes('replit.com')) {
+    console.error('Invalid URL detected:', fullUrl);
+    throw new Error('Invalid URL: External domain references are not allowed');
+  }
   
   const res = await fetch(fullUrl, {
     method: method,
@@ -35,6 +41,12 @@ export const getQueryFn: <T>(options: {
     // Ensure URL is absolute with leading slash
     const url = queryKey[0] as string;
     const fullUrl = url.startsWith('/') ? url : `/${url}`;
+    
+    // Ensure we're not accidentally using the full replit.com domain
+    if (fullUrl.includes('replit.com')) {
+      console.error('Invalid URL detected:', fullUrl);
+      throw new Error('Invalid URL: External domain references are not allowed');
+    }
     
     const res = await fetch(fullUrl, {
       credentials: "include",

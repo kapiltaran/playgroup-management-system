@@ -34,6 +34,20 @@ export default function Students() {
   // Fetch students
   const { data: students, isLoading: isLoadingStudents } = useQuery<Student[]>({
     queryKey: ["/api/students"],
+    queryFn: async () => {
+      // Force an authenticated request to the server
+      const response = await fetch('/api/students', {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include'
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Error ${response.status}: ${response.statusText}`);
+      }
+      
+      return response.json();
+    }
   });
 
   // Add student mutation
