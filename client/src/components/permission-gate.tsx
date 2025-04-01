@@ -39,6 +39,7 @@ function PermissionGateComponent(props: PermissionGateProps) {
   if ('allowedRoles' in props) {
     const { allowedRoles, children, fallback = null } = props;
     const hasPermission = user ? allowedRoles.includes(user.role) : false;
+    console.log(`[PermissionGate] Role check for ${user?.role} against ${allowedRoles.join(', ')}: ${hasPermission}`);
     return hasPermission ? <>{children}</> : <>{fallback}</>;
   }
   
@@ -61,6 +62,8 @@ function PermissionGateComponent(props: PermissionGateProps) {
         return false;
     }
   })();
+
+  console.log(`[PermissionGate] Module check for ${user?.role} on ${moduleName}.${permission}: ${hasPermission}`, permissions);
 
   // Render children if user has permission, otherwise render fallback
   return hasPermission ? <>{children}</> : <>{fallback}</>;

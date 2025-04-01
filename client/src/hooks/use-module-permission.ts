@@ -69,9 +69,14 @@ export function useModulePermission(module: ModuleType) {
   // Find permissions for current user's role and requested module
   useEffect(() => {
     if (rolePermissions && user) {
+      console.log(`[useModulePermission] Checking ${module} permissions for ${user.role}`);
+      console.log(`[useModulePermission] Available permissions:`, rolePermissions);
+      
       const permission = rolePermissions.find(
         p => p.role === user.role && p.module === module
       );
+
+      console.log(`[useModulePermission] Found permission:`, permission);
 
       if (permission) {
         setPermissions({
@@ -97,6 +102,8 @@ export function useModulePermission(module: ModuleType) {
           canDelete: false
         });
       }
+      
+      console.log(`[useModulePermission] Final permissions for ${module}:`, permissions);
     }
   }, [rolePermissions, user, module]);
 
