@@ -147,6 +147,22 @@ const AttendancePage = () => {
     return attendanceRecords.find((record: any) => record.studentId === studentId);
   };
   
+  // Initialize student notes from attendance records when records are loaded
+  React.useEffect(() => {
+    if (attendanceRecords && Array.isArray(attendanceRecords) && students && Array.isArray(students)) {
+      const notesObj: Record<number, string> = {};
+      
+      students.forEach((student: any) => {
+        const record = attendanceRecords.find((r: any) => r.studentId === student.id);
+        if (record) {
+          notesObj[student.id] = record.notes || '';
+        }
+      });
+      
+      setStudentNotes(notesObj);
+    }
+  }, [attendanceRecords, students]);
+  
   // Render loading state
   if (classesIsLoading) {
     return (
@@ -279,17 +295,6 @@ const AttendancePage = () => {
                           <TableBody>
                             {students.map((student: any) => {
                               const attendanceRecord = getStudentAttendance(student.id);
-                              
-                              // Initialize student notes if not already present
-                              React.useEffect(() => {
-                                if (attendanceRecord && !studentNotes[student.id]) {
-                                  setStudentNotes(prev => ({
-                                    ...prev,
-                                    [student.id]: attendanceRecord.notes || ''
-                                  }));
-                                }
-                              }, [attendanceRecord, student.id]);
-                              
                               const notes = studentNotes[student.id] || '';
                               const updateNotes = (value: string) => {
                                 setStudentNotes(prev => ({
