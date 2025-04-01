@@ -1,4 +1,4 @@
-import { useState } from "react";
+import React, { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -81,6 +81,10 @@ export function StudentForm({
   const { toast } = useToast();
   const [creatingAccount, setCreatingAccount] = useState(false);
   
+  // Log incoming defaultValues for debugging
+  console.log("🔴 StudentForm received defaultValues:", defaultValues);
+  
+  // Create the form with defaultValues or fallback defaults
   const form = useForm<StudentFormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: defaultValues || {
@@ -101,6 +105,15 @@ export function StudentForm({
       createAccount: true, // Set default to true
     },
   });
+  
+  // Force the form to reset when defaultValues change
+  // This ensures the form reflects the current student data after each edit button click
+  React.useEffect(() => {
+    console.log("🔴 defaultValues changed, resetting form with:", defaultValues);
+    if (defaultValues) {
+      form.reset(defaultValues);
+    }
+  }, [defaultValues, form]);
 
   const handleSubmit = async (values: StudentFormValues) => {
     try {

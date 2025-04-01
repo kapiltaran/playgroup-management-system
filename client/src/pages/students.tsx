@@ -198,6 +198,24 @@ export default function Students() {
   });
 
   const handleEditStudent = (student: Student) => {
+    console.log("🔴 handleEditStudent called with student:", student);
+    
+    // Format the date of birth to YYYY-MM-DD for the date input
+    if (student.dateOfBirth) {
+      try {
+        // Make sure the date is in YYYY-MM-DD format
+        const date = new Date(student.dateOfBirth);
+        const formattedDate = date.toISOString().split('T')[0];
+        student = {
+          ...student,
+          dateOfBirth: formattedDate
+        };
+      } catch (e) {
+        console.error("Error formatting date:", e);
+      }
+    }
+    
+    console.log("🔴 Setting selectedStudent for editing:", student);
     setSelectedStudent(student);
     setIsStudentFormOpen(true);
   };
@@ -464,6 +482,7 @@ export default function Students() {
           notes: selectedStudent.notes || undefined
         } : undefined}
         isSubmitting={addStudentMutation.isPending || updateStudentMutation.isPending}
+        isEditing={!!selectedStudent?.id}
       />
 
       {/* Delete Confirmation Dialog */}
