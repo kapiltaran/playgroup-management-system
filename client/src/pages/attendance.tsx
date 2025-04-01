@@ -248,8 +248,8 @@ const AttendancePage = () => {
                   <CardTitle>
                     {selectedClass && classes ? 
                       `Attendance for ${user?.role === 'teacher' 
-                        ? classes.find(c => (c.class?.id || c.id) === selectedClass)?.class?.name || 'Selected Class'
-                        : classes.find(c => c.id === selectedClass)?.name || 'Selected Class'}`
+                        ? classes.find((c: any) => (c.class?.id || c.id) === selectedClass)?.class?.name || 'Selected Class'
+                        : classes.find((c: any) => c.id === selectedClass)?.name || 'Selected Class'}`
                       : 'Class Attendance'
                     }
                   </CardTitle>
@@ -444,25 +444,33 @@ const AttendancePage = () => {
                     <div>
                       <span className="block text-sm font-medium">Present:</span>
                       <span className="font-bold text-green-600">
-                        {attendanceRecords?.filter((r: any) => r.status === 'present').length || 0}
+                        {Array.isArray(attendanceRecords) 
+                          ? attendanceRecords.filter((r: any) => r.status === 'present').length 
+                          : 0}
                       </span>
                     </div>
                     <div>
                       <span className="block text-sm font-medium">Absent:</span>
                       <span className="font-bold text-red-600">
-                        {attendanceRecords?.filter((r: any) => r.status === 'absent').length || 0}
+                        {Array.isArray(attendanceRecords) 
+                          ? attendanceRecords.filter((r: any) => r.status === 'absent').length 
+                          : 0}
                       </span>
                     </div>
                     <div>
                       <span className="block text-sm font-medium">Late:</span>
                       <span className="font-bold text-yellow-600">
-                        {attendanceRecords?.filter((r: any) => r.status === 'late').length || 0}
+                        {Array.isArray(attendanceRecords) 
+                          ? attendanceRecords.filter((r: any) => r.status === 'late').length 
+                          : 0}
                       </span>
                     </div>
                     <div>
                       <span className="block text-sm font-medium">Excused:</span>
                       <span className="font-bold text-blue-600">
-                        {attendanceRecords?.filter((r: any) => r.status === 'excused').length || 0}
+                        {Array.isArray(attendanceRecords) 
+                          ? attendanceRecords.filter((r: any) => r.status === 'excused').length 
+                          : 0}
                       </span>
                     </div>
                   </div>

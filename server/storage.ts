@@ -1732,7 +1732,7 @@ export class MemStorage implements IStorage {
     // Helper function to create properly typed role permissions
     const createPermissionConfig = (
       role: "parent" | "teacher" | "officeadmin" | "superadmin", 
-      module: "students" | "classes" | "fee_management" | "fee_payments" | "expenses" | "inventory" | "reports" | "settings" | "user_management" | "role_management",
+      module: "students" | "classes" | "fee_management" | "fee_payments" | "expenses" | "inventory" | "reports" | "settings" | "user_management" | "role_management" | "attendance",
       canView: boolean, 
       canCreate: boolean, 
       canEdit: boolean, 
@@ -1747,10 +1747,11 @@ export class MemStorage implements IStorage {
       createPermissionConfig('parent', 'fee_payments', true, true, false, false),
     ];
     
-    // Teacher role - can manage students and classes
+    // Teacher role - can manage students, classes, and attendance
     const teacherPermissions = [
       createPermissionConfig('teacher', 'students', true, true, true, false),
       createPermissionConfig('teacher', 'classes', true, false, true, false),
+      createPermissionConfig('teacher', 'attendance', true, true, true, true),
     ];
     
     // Office admin role - can manage most modules except user and role management
@@ -1764,6 +1765,7 @@ export class MemStorage implements IStorage {
       createPermissionConfig('officeadmin', 'reports', true, false, false, false),
       createPermissionConfig('officeadmin', 'settings', true, false, true, false),
       createPermissionConfig('officeadmin', 'user_management', true, true, true, false),
+      createPermissionConfig('officeadmin', 'attendance', true, true, true, true),
     ];
     
     // Combine all permissions
