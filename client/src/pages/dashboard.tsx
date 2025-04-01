@@ -172,16 +172,50 @@ export default function Dashboard() {
   };
 
   const { hasRole } = usePermission();
+  
+  // Use direct API call to get permissions for the current user
+  const { data: studentPermissions } = useQuery<any>({
+    queryKey: ["/api/module-permissions", "students"],
+    queryFn: async () => {
+      // Get user from the auth context
+      const authResponse = await fetch('/api/auth/me', {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include'
+      });
+      
+      if (!authResponse.ok) return null;
+      const { user } = await authResponse.json();
+      
+      if (!user?.role) return null;
+      
+      console.log(`🔴 [Dashboard] Fetching student permissions for role: ${user.role}`);
+      
+      // Get role-specific permissions
+      const response = await fetch(`/api/module-permissions?role=${user.role}`, {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include'
+      });
+      
+      if (!response.ok) return null;
+      
+      const data = await response.json();
+      console.log(`🔴 [Dashboard] Permissions API response:`, data);
+      return data.students || null;
+    }
+  });
 
   return (
     <div className="max-w-7xl mx-auto">
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
-        <PermissionGate allowedRoles={["teacher", "officeadmin", "superadmin"]}>
+        {/* Only show button if user explicitly has create permission from API response */}
+        {(studentPermissions?.canCreate === true || hasRole("superadmin")) && (
           <Button onClick={() => setIsStudentFormOpen(true)}>
             <UsersIcon className="mr-2 h-4 w-4" /> Add New Student
           </Button>
-        </PermissionGate>
+        )}
       </div>
 
       {/* Stats cards */}
