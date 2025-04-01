@@ -10,6 +10,8 @@ import { StudentForm } from "@/components/students/student-form";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/context/auth-context";
+import { useModulePermission } from "@/hooks/use-module-permission";
+import PermissionGate from "@/components/permission-gate";
 import { 
   AlertDialog,
   AlertDialogAction,
@@ -30,6 +32,7 @@ export default function Students() {
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   
   const isParent = user?.role === 'parent';
+  const { canCreate: canCreateStudent, canEdit: canEditStudent, canDelete: canDeleteStudent } = useModulePermission('students');
 
   // Fetch students
   const { data: students, isLoading: isLoadingStudents } = useQuery<Student[]>({
@@ -250,14 +253,14 @@ export default function Students() {
     <div className="max-w-7xl mx-auto">
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Students</h1>
-        {!isParent && (
+        <PermissionGate moduleName="students" permission="create">
           <Button onClick={() => {
             setSelectedStudent(null);
             setIsStudentFormOpen(true);
           }}>
             <UsersIcon className="mr-2 h-4 w-4" /> Add New Student
           </Button>
-        )}
+        </PermissionGate>
       </div>
 
       <div className="bg-white shadow rounded-lg">
@@ -311,16 +314,21 @@ export default function Students() {
                 header: "Actions",
                 cell: (student: any) => (
                   <div className="flex space-x-2">
-                    <Button variant="outline" size="sm" onClick={() => handleEditStudent(student)}>
-                      <PencilIcon className="h-4 w-4" />
-                    </Button>
-                    <Button variant="outline" size="sm" onClick={() => handleDeleteStudent(student)}>
-                      <Trash2Icon className="h-4 w-4" />
-                    </Button>
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      onClick={async () => {
+                    <PermissionGate moduleName="students" permission="edit">
+                      <Button variant="outline" size="sm" onClick={() => handleEditStudent(student)}>
+                        <PencilIcon className="h-4 w-4" />
+                      </Button>
+                    </PermissionGate>
+                    <PermissionGate moduleName="students" permission="delete">
+                      <Button variant="outline" size="sm" onClick={() => handleDeleteStudent(student)}>
+                        <Trash2Icon className="h-4 w-4" />
+                      </Button>
+                    </PermissionGate>
+                    <PermissionGate moduleName="user_management" permission="create">
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        onClick={async () => {
                         try {
                           console.log("[CLIENT] Creating parent account for student:", student.id);
                           toast({
@@ -376,6 +384,7 @@ export default function Students() {
                     >
                       Create Account
                     </Button>
+                    </PermissionGate>
                   </div>
                 )
               }

@@ -1,45 +1,71 @@
 import { ReactNode } from 'react';
-import { usePermission } from '@/hooks/use-permission';
+import { useModulePermission } from '@/hooks/use-module-permission';
+import type { ModuleType } from '@/hooks/use-module-permission';
+import { useAuth } from '@/context/auth-context';
 
-type RoleType = "parent" | "teacher" | "officeadmin" | "superadmin";
-
-interface PermissionGateProps {
+interface ModulePermissionGateProps {
+  moduleName: ModuleType;
+  permission: 'view' | 'create' | 'edit' | 'delete';
   children: ReactNode;
-  allowedRoles?: RoleType[];
-  minRole?: RoleType;
   fallback?: ReactNode;
 }
 
+interface RolePermissionGateProps {
+  allowedRoles: string[];
+  children: ReactNode;
+  fallback?: ReactNode;
+}
+
+type PermissionGateProps = ModulePermissionGateProps | RolePermissionGateProps;
+
 /**
- * Component that conditionally renders its children based on user permissions
+ * A component that conditionally renders its children based on user module permissions
  * 
- * @param children Content to display if user has permission
- * @param allowedRoles Specific roles that are allowed (optional)
- * @param minRole Minimum role required in hierarchy (optional)
- * @param fallback Optional content to display if permission is denied
+ * @example
+ * // Only show "Add Student" button for users with create permission
+ * <PermissionGate moduleName="students" permission="create">
+ *   <Button>Add Student</Button>
+ * </PermissionGate>
+ * 
+ * // Only show content for specific roles
+ * <PermissionGate allowedRoles={["superadmin", "officeadmin"]}>
+ *   <RestrictedContent />
+ * </PermissionGate>
  */
-export default function PermissionGate({ 
-  children, 
-  allowedRoles, 
-  minRole,
-  fallback = null
-}: PermissionGateProps) {
-  const permission = usePermission();
+function PermissionGateComponent(props: PermissionGateProps) {
+  const { user } = useAuth();
   
-  // Check if user has necessary permissions
-  let hasPermission = false;
-  
-  if (allowedRoles && allowedRoles.length > 0) {
-    hasPermission = permission.hasRole(allowedRoles);
-  } else if (minRole) {
-    hasPermission = permission.hasAtLeastRole(minRole);
+  // Check if props is for role-based permission
+  if ('allowedRoles' in props) {
+    const { allowedRoles, children, fallback = null } = props;
+    const hasPermission = user ? allowedRoles.includes(user.role) : false;
+    return hasPermission ? <>{children}</> : <>{fallback}</>;
   }
   
-  // If no permission checks provided, default to showing content
-  if (!allowedRoles && !minRole) {
-    hasPermission = true;
-  }
+  // Otherwise it's for module-based permissions
+  const { moduleName, permission, children, fallback = null } = props;
+  const permissions = useModulePermission(moduleName);
   
-  // Return children if user has permission, otherwise return fallback content or null
+  // Check if the user has the requested permission
+  const hasPermission = (() => {
+    switch (permission) {
+      case 'view':
+        return permissions.canView;
+      case 'create':
+        return permissions.canCreate;
+      case 'edit':
+        return permissions.canEdit;
+      case 'delete':
+        return permissions.canDelete;
+      default:
+        return false;
+    }
+  })();
+
+  // Render children if user has permission, otherwise render fallback
   return hasPermission ? <>{children}</> : <>{fallback}</>;
 }
+
+// Export as both named and default export
+export const PermissionGate = PermissionGateComponent;
+export default PermissionGateComponent;
