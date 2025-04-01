@@ -260,20 +260,60 @@ export default function Students() {
     }
   };
 
-  console.log('[Students Page] Rendering with canCreateStudent:', canCreateStudent);
+  // Use direct API call to get permissions for the current role
+  const { data: directPermissions, isLoading: isLoadingPermissions } = useQuery<any>({
+    queryKey: [`/api/module-permissions`, user?.role],
+    queryFn: async () => {
+      if (!user?.role) return null;
+      
+      console.log(`🔴 Fetching permissions for role: ${user.role}`);
+      
+      // This needs to include the role as a query parameter
+      const response = await fetch(`/api/module-permissions?role=${user.role}`, {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include'
+      });
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`🔴 Permission API error: ${response.status}`, errorText);
+        throw new Error(`Error ${response.status}: ${errorText}`);
+      }
+      
+      const data = await response.json();
+      console.log(`🔴 Permissions API response for ${user.role}:`, data);
+      return data;
+    },
+    enabled: !!user
+  });
+  
+  // Check if user can create students based on the direct API response
+  // If directPermissions is null or students permissions are not defined,
+  // default to false unless user is superadmin
+  const canCreateFromAPI = user?.role === 'superadmin' || 
+                           (directPermissions?.students?.canCreate === true);
+  
+  console.log('🔴 Final permission check:', {
+    role: user?.role,
+    hookPermission: canCreateStudent,
+    apiPermission: canCreateFromAPI,
+    directPermissions: directPermissions
+  });
 
   return (
     <div className="max-w-7xl mx-auto">
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Students</h1>
-        {canCreateStudent ? (
+        {/* Use the direct API permission check */}
+        {canCreateFromAPI === true && (
           <Button onClick={() => {
             setSelectedStudent(null);
             setIsStudentFormOpen(true);
           }}>
             <UsersIcon className="mr-2 h-4 w-4" /> Add New Student
           </Button>
-        ) : null}
+        )}
       </div>
 
       <div className="bg-white shadow rounded-lg">
@@ -327,12 +367,13 @@ export default function Students() {
                 header: "Actions",
                 cell: (student: any) => (
                   <div className="flex space-x-2">
-                    {canEditStudent && (
+                    {/* Use direct API permissions for edit/delete too */}
+                    {directPermissions?.students?.canEdit === true && (
                       <Button variant="outline" size="sm" onClick={() => handleEditStudent(student)}>
                         <PencilIcon className="h-4 w-4" />
                       </Button>
                     )}
-                    {canDeleteStudent && (
+                    {directPermissions?.students?.canDelete === true && (
                       <Button variant="outline" size="sm" onClick={() => handleDeleteStudent(student)}>
                         <Trash2Icon className="h-4 w-4" />
                       </Button>
