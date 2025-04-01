@@ -249,18 +249,20 @@ export default function Students() {
     }
   };
 
+  console.log('[Students Page] Rendering with canCreateStudent:', canCreateStudent);
+
   return (
     <div className="max-w-7xl mx-auto">
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Students</h1>
-        <PermissionGate moduleName="students" permission="create">
+        {canCreateStudent ? (
           <Button onClick={() => {
             setSelectedStudent(null);
             setIsStudentFormOpen(true);
           }}>
             <UsersIcon className="mr-2 h-4 w-4" /> Add New Student
           </Button>
-        </PermissionGate>
+        ) : null}
       </div>
 
       <div className="bg-white shadow rounded-lg">
@@ -314,16 +316,16 @@ export default function Students() {
                 header: "Actions",
                 cell: (student: any) => (
                   <div className="flex space-x-2">
-                    <PermissionGate moduleName="students" permission="edit">
+                    {canEditStudent && (
                       <Button variant="outline" size="sm" onClick={() => handleEditStudent(student)}>
                         <PencilIcon className="h-4 w-4" />
                       </Button>
-                    </PermissionGate>
-                    <PermissionGate moduleName="students" permission="delete">
+                    )}
+                    {canDeleteStudent && (
                       <Button variant="outline" size="sm" onClick={() => handleDeleteStudent(student)}>
                         <Trash2Icon className="h-4 w-4" />
                       </Button>
-                    </PermissionGate>
+                    )}
                     <PermissionGate moduleName="user_management" permission="create">
                       <Button 
                         variant="outline" 

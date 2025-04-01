@@ -40,12 +40,15 @@ interface RolePermission {
  */
 export function useModulePermission(module: ModuleType) {
   const { user } = useAuth();
+  // Initialize with false permissions for safety
   const [permissions, setPermissions] = useState<ModulePermission>({
     canView: false,
     canCreate: false,
     canEdit: false,
     canDelete: false
   });
+  
+  console.log(`[useModulePermission] Initializing hook for module: ${module}, user: ${user?.username}, role: ${user?.role}`);
 
   // Fetch role permissions
   const { data: rolePermissions } = useQuery<RolePermission[]>({
