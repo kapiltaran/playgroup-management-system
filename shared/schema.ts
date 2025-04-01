@@ -15,7 +15,8 @@ export const moduleEnum = pgEnum('module', [
   'reports',
   'settings',
   'user_management',
-  'role_management'
+  'role_management',
+  'attendance'
 ]);
 
 // Class schema

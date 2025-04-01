@@ -21,6 +21,7 @@ const AttendancePage = () => {
   const [selectedClass, setSelectedClass] = useState<number | null>(null);
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [currentTab, setCurrentTab] = useState("mark");
+  const [studentNotes, setStudentNotes] = useState<Record<number, string>>({});
   
   // Fetch teacher's classes
   const { data: teacherClasses, isLoading: classesLoading } = useQuery({
@@ -278,7 +279,24 @@ const AttendancePage = () => {
                           <TableBody>
                             {students.map((student: any) => {
                               const attendanceRecord = getStudentAttendance(student.id);
-                              const [notes, setNotes] = useState(attendanceRecord?.notes || '');
+                              
+                              // Initialize student notes if not already present
+                              React.useEffect(() => {
+                                if (attendanceRecord && !studentNotes[student.id]) {
+                                  setStudentNotes(prev => ({
+                                    ...prev,
+                                    [student.id]: attendanceRecord.notes || ''
+                                  }));
+                                }
+                              }, [attendanceRecord, student.id]);
+                              
+                              const notes = studentNotes[student.id] || '';
+                              const updateNotes = (value: string) => {
+                                setStudentNotes(prev => ({
+                                  ...prev,
+                                  [student.id]: value
+                                }));
+                              };
                               
                               return (
                                 <TableRow key={student.id}>
@@ -316,7 +334,7 @@ const AttendancePage = () => {
                                     <Textarea 
                                       placeholder="Optional notes"
                                       value={notes}
-                                      onChange={(e) => setNotes(e.target.value)}
+                                      onChange={(e) => updateNotes(e.target.value)}
                                       rows={1}
                                       className="min-h-0"
                                     />
