@@ -22,13 +22,17 @@ import {
   type User,
   type InsertUser,
   type RolePermission,
-  type InsertRolePermission
+  type InsertRolePermission,
+  type TeacherClass,
+  type InsertTeacherClass,
+  type Attendance,
+  type InsertAttendance
 } from "@shared/schema";
 
 // Storage interface
 export interface IStorage {
   // Student methods
-  getStudents(): Promise<Student[]>;
+  getStudents(userId?: number): Promise<Student[]>;
   getStudentsByClass(classId: number): Promise<Student[]>;
   getStudentsByParent(userId: number): Promise<Student[]>;
   getStudent(id: number): Promise<Student | undefined>;
@@ -141,6 +145,19 @@ export interface IStorage {
   // Check module permissions
   checkPermission(role: string, module: string, permission: 'view' | 'create' | 'edit' | 'delete'): Promise<boolean>;
   getModulePermissions(role: string): Promise<Record<string, {canView: boolean, canCreate: boolean, canEdit: boolean, canDelete: boolean}>>;
+  
+  // Teacher-Class methods
+  getTeacherClasses(teacherId?: number): Promise<(TeacherClass & { class: Class })[]>;
+  getClassTeachers(classId: number): Promise<(TeacherClass & { teacher: User })[]>;
+  assignTeacherToClass(teacherId: number, classId: number): Promise<TeacherClass>;
+  removeTeacherFromClass(teacherId: number, classId: number): Promise<boolean>;
+  
+  // Attendance methods
+  getAttendance(classId: number, date?: Date): Promise<Attendance[]>;
+  getStudentAttendance(studentId: number, startDate?: Date, endDate?: Date): Promise<Attendance[]>;
+  markAttendance(attendance: InsertAttendance): Promise<Attendance>;
+  updateAttendance(id: number, attendance: Partial<InsertAttendance>): Promise<Attendance | undefined>;
+  getClassAttendanceReport(classId: number, month: number, year: number): Promise<any[]>;
 }
 
 export class MemStorage implements IStorage {
@@ -156,6 +173,8 @@ export class MemStorage implements IStorage {
   private settings: Map<number, Setting>;
   private users: Map<number, User>;
   private rolePermissions: Map<number, RolePermission>;
+  private teacherClasses: Map<string, TeacherClass>; // Key: teacherId-classId
+  private attendance: Map<number, Attendance>;
   
   private studentId: number;
   private expenseId: number;
@@ -168,8 +187,8 @@ export class MemStorage implements IStorage {
   private reminderId: number;
   private settingId: number;
   private userId: number;
-
   private rolePermissionId: number;
+  private attendanceId: number;
 
   constructor() {
     this.students = new Map();
@@ -184,6 +203,8 @@ export class MemStorage implements IStorage {
     this.settings = new Map();
     this.users = new Map();
     this.rolePermissions = new Map();
+    this.teacherClasses = new Map();
+    this.attendance = new Map();
     
     this.studentId = 1;
     this.expenseId = 1;
@@ -197,6 +218,7 @@ export class MemStorage implements IStorage {
     this.settingId = 1;
     this.userId = 1;
     this.rolePermissionId = 1;
+    this.attendanceId = 1;
     
     // Initialize with sample data asynchronously
     setTimeout(() => {
@@ -445,7 +467,41 @@ export class MemStorage implements IStorage {
   }
 
   // Student methods
-  async getStudents(): Promise<Student[]> {
+  async getStudents(userId?: number): Promise<Student[]> {
+    // If no userId provided, return all students
+    if (!userId) {
+      return Array.from(this.students.values()).sort((a, b) => b.id - a.id);
+    }
+    
+    // Get the user and check their role
+    const user = this.users.get(userId);
+    if (!user) {
+      return [];
+    }
+    
+    // If the user is a parent, return only their students
+    if (user.role === 'parent') {
+      return this.getStudentsByParent(userId);
+    }
+    
+    // If the user is a teacher, return only students in their assigned classes
+    if (user.role === 'teacher') {
+      // Get all classes the teacher is assigned to
+      const teacherClasses = Array.from(this.teacherClasses.values())
+        .filter(tc => tc.teacherId === userId)
+        .map(tc => tc.classId);
+      
+      if (teacherClasses.length === 0) {
+        return []; // Teacher is not assigned to any classes
+      }
+      
+      // Get all students in those classes
+      return Array.from(this.students.values())
+        .filter(student => student.classId !== null && teacherClasses.includes(student.classId))
+        .sort((a, b) => b.id - a.id);
+    }
+    
+    // For admin roles, return all students
     return Array.from(this.students.values()).sort((a, b) => b.id - a.id);
   }
 
@@ -1484,6 +1540,135 @@ export class MemStorage implements IStorage {
     return result;
   }
 
+  private async initializeTeacherClassAssociations() {
+    try {
+      // Get teachers
+      const teacher1 = await this.getUserByUsername('john.teacher');
+      const teacher2 = await this.getUserByUsername('mary.teacher');
+      
+      if (!teacher1 && !teacher2) {
+        console.log("No teachers found to assign classes");
+        return;
+      }
+      
+      // Create a new teacher if needed
+      let teacher2Id = 0;
+      if (!teacher2) {
+        const newTeacher = await this.createUser({
+          username: 'mary.teacher',
+          email: 'mary.teacher@playgroupms.com',
+          passwordHash: 'hashed_teacher123',
+          fullName: 'Mary Teacher',
+          role: 'teacher',
+          emailVerified: true,
+          active: true
+        });
+        teacher2Id = newTeacher.id;
+      } else {
+        teacher2Id = teacher2.id;
+      }
+      
+      // Get classes
+      const classes = await this.getClasses();
+      
+      if (classes.length < 3) {
+        console.log("Not enough classes to assign teachers");
+        return;
+      }
+      
+      // Assign teachers to classes (make sure assignments match the expected class IDs in student data)
+      if (teacher1) {
+        // Assign first teacher to all classes to ensure coverage
+        for (const classObj of classes) {
+          await this.assignTeacherToClass(teacher1.id, classObj.id);
+        }
+        console.log(`Assigned teacher ${teacher1.fullName} to all classes for full coverage`);
+      }
+      
+      // Also assign second teacher to all classes as backup
+      if (teacher2Id) {
+        for (const classObj of classes) {
+          await this.assignTeacherToClass(teacher2Id, classObj.id);
+        }
+        console.log(`Assigned second teacher to all classes as backup`);
+      }
+    } catch (error) {
+      console.error("Error initializing teacher-class associations:", error);
+    }
+  }
+  
+  private async initializeAttendanceRecords() {
+    try {
+      // Get students by class
+      const students = await this.getStudents();
+      
+      if (students.length === 0) {
+        console.log("No students found for attendance records");
+        return;
+      }
+      
+      // Create dates for attendance records
+      const today = new Date();
+      const yesterday = new Date(today);
+      yesterday.setDate(yesterday.getDate() - 1);
+      
+      // Track successfully marked attendance
+      let markedCount = 0;
+      
+      // Create sample attendance for each student
+      for (const student of students) {
+        if (!student.classId) continue;
+        
+        // Find teachers assigned to the student's class
+        const classTeachers = await this.getClassTeachers(student.classId);
+        
+        if (classTeachers.length === 0) {
+          console.log(`No teachers found for class ID ${student.classId}, skipping attendance for student ${student.fullName}`);
+          continue;
+        }
+        
+        // Use the first teacher in the list to mark attendance
+        const markingTeacherId = classTeachers[0].teacherId;
+        
+        // Mark yesterday's attendance with random statuses
+        const yesterdayStatus = ['present', 'absent', 'late', 'excused'][Math.floor(Math.random() * 4)] as 'present' | 'absent' | 'late' | 'excused';
+        
+        try {
+          await this.markAttendance({
+            studentId: student.id,
+            classId: student.classId,
+            date: yesterday.toISOString().split('T')[0],
+            status: yesterdayStatus,
+            markedById: markingTeacherId,
+            notes: yesterdayStatus === 'late' ? 'Arrived 15 minutes late' : 
+                   yesterdayStatus === 'excused' ? 'Doctor appointment' : null
+          });
+          
+          // Mark today's attendance with random statuses, weighted toward present
+          const todayStatus = ['present', 'present', 'present', 'late', 'absent', 'excused'][Math.floor(Math.random() * 6)] as 'present' | 'absent' | 'late' | 'excused';
+          
+          await this.markAttendance({
+            studentId: student.id,
+            classId: student.classId,
+            date: today.toISOString().split('T')[0],
+            status: todayStatus,
+            markedById: markingTeacherId,
+            notes: todayStatus === 'late' ? 'Traffic delay' : 
+                   todayStatus === 'excused' ? 'Family emergency' : null
+          });
+          
+          markedCount++;
+        } catch (err) {
+          console.error(`Error marking attendance for student ${student.fullName}: ${err.message}`);
+        }
+      }
+      
+      console.log(`Created attendance records for ${markedCount} students over 2 days`);
+    } catch (error) {
+      console.error("Error initializing attendance records:", error);
+    }
+  }
+  
   private async initializeSampleData() {
     // Create a default admin user
     const adminExists = await this.getUserByUsername('admin');
@@ -1851,6 +2036,368 @@ export class MemStorage implements IStorage {
         }
       }
     }
+    
+    // Initialize teacher-class associations
+    await this.initializeTeacherClassAssociations();
+    
+    // Initialize attendance records
+    await this.initializeAttendanceRecords();
+    
+    console.log("✅ Sample data initialization complete, including teacher-class associations and attendance records");
+  }
+  
+  // Teacher-Class methods
+  async getTeacherClasses(teacherId?: number): Promise<(TeacherClass & { class: Class })[]> {
+    // Get all teacher-class associations
+    const associations = Array.from(this.teacherClasses.values());
+    
+    // Filter by teacherId if provided
+    const filteredAssociations = teacherId 
+      ? associations.filter(tc => tc.teacherId === teacherId)
+      : associations;
+    
+    // Enrich with class data
+    return filteredAssociations.map(tc => {
+      const classData = this.classes.get(tc.classId);
+      return {
+        ...tc,
+        class: classData!
+      };
+    });
+  }
+  
+  async getClassTeachers(classId: number): Promise<(TeacherClass & { teacher: User })[]> {
+    // Get teacher associations for this class
+    const associations = Array.from(this.teacherClasses.values())
+      .filter(tc => tc.classId === classId);
+    
+    // Enrich with teacher data
+    return associations.map(tc => {
+      const teacher = this.users.get(tc.teacherId);
+      return {
+        ...tc,
+        teacher: teacher!
+      };
+    });
+  }
+  
+  async assignTeacherToClass(teacherId: number, classId: number): Promise<TeacherClass> {
+    // Ensure the teacher and class exist
+    const teacher = this.users.get(teacherId);
+    const classObj = this.classes.get(classId);
+    
+    if (!teacher || !classObj) {
+      throw new Error("Teacher or class not found");
+    }
+    
+    if (teacher.role !== 'teacher') {
+      throw new Error("User is not a teacher");
+    }
+    
+    const key = `${teacherId}-${classId}`;
+    const now = new Date();
+    
+    // Check if the association already exists
+    if (this.teacherClasses.has(key)) {
+      return this.teacherClasses.get(key)!;
+    }
+    
+    // Create the association
+    const association: TeacherClass = {
+      teacherId,
+      classId,
+      assignedDate: now
+    };
+    
+    this.teacherClasses.set(key, association);
+    
+    // Log activity
+    this.createActivity({
+      type: 'teacher',
+      action: 'assign',
+      details: { 
+        teacherId, 
+        teacherName: teacher.fullName, 
+        classId, 
+        className: classObj.name 
+      }
+    });
+    
+    return association;
+  }
+  
+  async removeTeacherFromClass(teacherId: number, classId: number): Promise<boolean> {
+    const key = `${teacherId}-${classId}`;
+    
+    // Check if the association exists
+    if (!this.teacherClasses.has(key)) {
+      return false;
+    }
+    
+    const teacher = this.users.get(teacherId);
+    const classObj = this.classes.get(classId);
+    
+    const success = this.teacherClasses.delete(key);
+    
+    if (success && teacher && classObj) {
+      // Log activity
+      this.createActivity({
+        type: 'teacher',
+        action: 'unassign',
+        details: { 
+          teacherId, 
+          teacherName: teacher.fullName, 
+          classId, 
+          className: classObj.name 
+        }
+      });
+    }
+    
+    return success;
+  }
+  
+  // Attendance methods
+  async getAttendance(classId: number, date?: Date): Promise<Attendance[]> {
+    let attendanceRecords = Array.from(this.attendance.values())
+      .filter(a => a.classId === classId);
+    
+    if (date) {
+      const dateStr = date.toISOString().split('T')[0]; // Format as YYYY-MM-DD
+      attendanceRecords = attendanceRecords.filter(a => {
+        const attendanceDate = new Date(a.date).toISOString().split('T')[0];
+        return attendanceDate === dateStr;
+      });
+    }
+    
+    return attendanceRecords.sort((a, b) => {
+      // Sort by date (descending) then by student name (ascending)
+      const dateA = new Date(a.date).getTime();
+      const dateB = new Date(b.date).getTime();
+      
+      if (dateA !== dateB) {
+        return dateB - dateA;
+      }
+      
+      const studentA = this.students.get(a.studentId);
+      const studentB = this.students.get(b.studentId);
+      
+      if (studentA && studentB) {
+        return studentA.fullName.localeCompare(studentB.fullName);
+      }
+      
+      return 0;
+    });
+  }
+  
+  async getStudentAttendance(studentId: number, startDate?: Date, endDate?: Date): Promise<Attendance[]> {
+    let attendanceRecords = Array.from(this.attendance.values())
+      .filter(a => a.studentId === studentId);
+    
+    if (startDate) {
+      const startDateTimestamp = startDate.getTime();
+      attendanceRecords = attendanceRecords.filter(a => {
+        const attendanceDate = new Date(a.date).getTime();
+        return attendanceDate >= startDateTimestamp;
+      });
+    }
+    
+    if (endDate) {
+      const endDateTimestamp = endDate.getTime();
+      attendanceRecords = attendanceRecords.filter(a => {
+        const attendanceDate = new Date(a.date).getTime();
+        return attendanceDate <= endDateTimestamp;
+      });
+    }
+    
+    return attendanceRecords.sort((a, b) => {
+      // Sort by date (descending)
+      const dateA = new Date(a.date).getTime();
+      const dateB = new Date(b.date).getTime();
+      return dateB - dateA;
+    });
+  }
+  
+  async markAttendance(attendanceData: InsertAttendance): Promise<Attendance> {
+    const id = this.attendanceId++;
+    const now = new Date();
+    
+    // Ensure the student and class exist
+    const student = this.students.get(attendanceData.studentId);
+    const classObj = this.classes.get(attendanceData.classId);
+    const teacher = this.users.get(attendanceData.markedById);
+    
+    if (!student || !classObj || !teacher) {
+      throw new Error("Student, class, or teacher not found");
+    }
+    
+    // Check if student belongs to the class
+    if (student.classId !== attendanceData.classId) {
+      throw new Error("Student does not belong to this class");
+    }
+    
+    // Check if the user marking attendance is a teacher or admin
+    if (!['teacher', 'officeadmin', 'superadmin'].includes(teacher.role)) {
+      throw new Error("Only teachers and administrators can mark attendance");
+    }
+    
+    // If it's a teacher, check if they're assigned to this class
+    if (teacher.role === 'teacher') {
+      const key = `${teacher.id}-${attendanceData.classId}`;
+      if (!this.teacherClasses.has(key)) {
+        throw new Error("Teacher is not assigned to this class");
+      }
+    }
+    
+    // Create the attendance record
+    const attendance: Attendance = {
+      ...attendanceData,
+      id,
+      createdAt: now,
+      updatedAt: now,
+      notes: attendanceData.notes || null
+    };
+    
+    this.attendance.set(id, attendance);
+    
+    // Log activity
+    this.createActivity({
+      type: 'attendance',
+      action: 'mark',
+      details: { 
+        studentId: student.id, 
+        studentName: student.fullName, 
+        classId: classObj.id, 
+        className: classObj.name,
+        date: attendanceData.date,
+        status: attendanceData.status
+      }
+    });
+    
+    return attendance;
+  }
+  
+  async updateAttendance(id: number, attendanceData: Partial<InsertAttendance>): Promise<Attendance | undefined> {
+    const attendance = this.attendance.get(id);
+    if (!attendance) return undefined;
+    
+    // If student or class is being changed, verify the new data
+    if (attendanceData.studentId || attendanceData.classId) {
+      const studentId = attendanceData.studentId || attendance.studentId;
+      const classId = attendanceData.classId || attendance.classId;
+      
+      const student = this.students.get(studentId);
+      const classObj = this.classes.get(classId);
+      
+      if (!student || !classObj) {
+        throw new Error("Student or class not found");
+      }
+      
+      // Check if student belongs to the class
+      if (student.classId !== classId) {
+        throw new Error("Student does not belong to this class");
+      }
+    }
+    
+    // If the user marking is being changed, verify the new user
+    if (attendanceData.markedById) {
+      const teacher = this.users.get(attendanceData.markedById);
+      
+      if (!teacher) {
+        throw new Error("Teacher not found");
+      }
+      
+      // Check if the user is a teacher or admin
+      if (!['teacher', 'officeadmin', 'superadmin'].includes(teacher.role)) {
+        throw new Error("Only teachers and administrators can mark attendance");
+      }
+      
+      // If it's a teacher, check if they're assigned to this class
+      if (teacher.role === 'teacher') {
+        const classId = attendanceData.classId || attendance.classId;
+        const key = `${teacher.id}-${classId}`;
+        if (!this.teacherClasses.has(key)) {
+          throw new Error("Teacher is not assigned to this class");
+        }
+      }
+    }
+    
+    const now = new Date();
+    const updatedAttendance = { 
+      ...attendance, 
+      ...attendanceData,
+      updatedAt: now,
+      notes: attendanceData.notes !== undefined ? (attendanceData.notes || null) : attendance.notes
+    };
+    
+    this.attendance.set(id, updatedAttendance);
+    
+    // Log activity
+    const student = this.students.get(updatedAttendance.studentId);
+    const classObj = this.classes.get(updatedAttendance.classId);
+    
+    if (student && classObj) {
+      this.createActivity({
+        type: 'attendance',
+        action: 'update',
+        details: { 
+          studentId: student.id, 
+          studentName: student.fullName, 
+          classId: classObj.id, 
+          className: classObj.name,
+          date: updatedAttendance.date,
+          status: updatedAttendance.status
+        }
+      });
+    }
+    
+    return updatedAttendance;
+  }
+  
+  async getClassAttendanceReport(classId: number, month: number, year: number): Promise<any[]> {
+    // Get students in this class
+    const students = await this.getStudentsByClass(classId);
+    
+    // Get attendance for this class in the specified month
+    const startDate = new Date(year, month - 1, 1); // Month is 0-indexed in JS Date
+    const endDate = new Date(year, month, 0); // Last day of the month
+    
+    const classAttendance = Array.from(this.attendance.values())
+      .filter(a => {
+        const attendanceDate = new Date(a.date);
+        return (
+          a.classId === classId &&
+          attendanceDate >= startDate &&
+          attendanceDate <= endDate
+        );
+      });
+    
+    // Group attendance by student
+    const studentAttendance = students.map(student => {
+      const attendanceRecords = classAttendance.filter(a => a.studentId === student.id);
+      
+      // Count attendance by status
+      const statusCounts = {
+        present: attendanceRecords.filter(a => a.status === 'present').length,
+        absent: attendanceRecords.filter(a => a.status === 'absent').length,
+        late: attendanceRecords.filter(a => a.status === 'late').length,
+        excused: attendanceRecords.filter(a => a.status === 'excused').length,
+        total: attendanceRecords.length
+      };
+      
+      // Calculate attendance percentage
+      const attendancePercentage = statusCounts.total > 0
+        ? Math.round(((statusCounts.present + statusCounts.late) / statusCounts.total) * 100)
+        : 0;
+      
+      return {
+        student,
+        statusCounts,
+        attendancePercentage,
+        records: attendanceRecords
+      };
+    });
+    
+    return studentAttendance;
   }
 }
 

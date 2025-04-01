@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, boolean, numeric, timestamp, json, date, foreignKey, pgEnum } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, numeric, timestamp, json, date, foreignKey, pgEnum, primaryKey } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -246,6 +246,40 @@ export const insertRolePermissionSchema = createInsertSchema(rolePermissions).om
   updatedAt: true,
 });
 
+// Teacher to Class association schema (many-to-many relationship)
+export const teacherClasses = pgTable("teacher_classes", {
+  teacherId: integer("teacher_id").notNull().references(() => users.id),
+  classId: integer("class_id").notNull().references(() => classes.id),
+  assignedDate: timestamp("assigned_date").defaultNow(),
+}, (table) => {
+  return {
+    pk: primaryKey({ columns: [table.teacherId, table.classId] })
+  };
+});
+
+export const insertTeacherClassSchema = createInsertSchema(teacherClasses).omit({
+  assignedDate: true,
+});
+
+// Attendance schema
+export const attendance = pgTable("attendance", {
+  id: serial("id").primaryKey(),
+  studentId: integer("student_id").notNull().references(() => students.id),
+  classId: integer("class_id").notNull().references(() => classes.id),
+  date: date("date").notNull(),
+  status: text("status").notNull(), // 'present', 'absent', 'late', 'excused'
+  notes: text("notes"),
+  markedById: integer("marked_by_id").notNull().references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertAttendanceSchema = createInsertSchema(attendance).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 // Type definitions for TypeScript
 export type Student = typeof students.$inferSelect;
 export type InsertStudent = z.infer<typeof insertStudentSchema>;
@@ -267,6 +301,10 @@ export type Activity = typeof activities.$inferSelect;
 export type InsertActivity = z.infer<typeof insertActivitySchema>;
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
+export type TeacherClass = typeof teacherClasses.$inferSelect;
+export type InsertTeacherClass = z.infer<typeof insertTeacherClassSchema>;
+export type Attendance = typeof attendance.$inferSelect;
+export type InsertAttendance = z.infer<typeof insertAttendanceSchema>;
 export type Setting = typeof settings.$inferSelect;
 export type InsertSetting = z.infer<typeof insertSettingsSchema>;
 export type RolePermission = typeof rolePermissions.$inferSelect;

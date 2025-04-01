@@ -12,7 +12,8 @@ import {
   ClipboardCheckIcon,
   ShieldIcon,
   UserCogIcon,
-  LogOutIcon
+  LogOutIcon,
+  CalendarCheckIcon
 } from "lucide-react";
 import { useAuth } from "@/context/auth-context";
 
@@ -46,6 +47,12 @@ export default function Sidebar({ setOpen }: SidebarProps) {
       href: "/classes",
       label: "Classes",
       icon: <GraduationCapIcon className="text-xl mr-3" />,
+      roles: ["teacher", "officeadmin", "superadmin"]
+    },
+    {
+      href: "/attendance",
+      label: "Attendance",
+      icon: <CalendarCheckIcon className="text-xl mr-3" />,
       roles: ["teacher", "officeadmin", "superadmin"]
     },
     {

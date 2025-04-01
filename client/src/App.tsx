@@ -10,6 +10,7 @@ import Expenses from "@/pages/expenses";
 import Inventory from "@/pages/inventory";
 import Reports from "@/pages/reports";
 import Classes from "@/pages/classes";
+import Attendance from "@/pages/attendance";
 import FeeManagement from "@/pages/fee-management";
 import FeePayments from "@/pages/fee-payments";
 import Settings from "@/pages/settings";
@@ -39,9 +40,9 @@ function AuthenticatedApp() {
   // Define allowed paths for each role
   const rolePathMap = {
     parent: ["/students"],
-    teacher: ["/dashboard", "/students", "/classes", "/inventory"],
-    officeadmin: ["/dashboard", "/students", "/classes", "/fee-management", "/fee-payments", "/expenses", "/inventory", "/reports"],
-    superadmin: ["/dashboard", "/students", "/classes", "/fee-management", "/fee-payments", "/expenses", "/inventory", "/reports", "/settings", "/role-management", "/user-management"]
+    teacher: ["/dashboard", "/students", "/classes", "/attendance", "/inventory"],
+    officeadmin: ["/dashboard", "/students", "/classes", "/attendance", "/fee-management", "/fee-payments", "/expenses", "/inventory", "/reports"],
+    superadmin: ["/dashboard", "/students", "/classes", "/attendance", "/fee-management", "/fee-payments", "/expenses", "/inventory", "/reports", "/settings", "/role-management", "/user-management"]
   };
 
   // Redirect to allowed page based on role
@@ -89,6 +90,12 @@ function AuthenticatedApp() {
         <Route path="/classes">
           <ProtectedRoute 
             component={Classes} 
+            allowedRoles={["teacher", "officeadmin", "superadmin"]} 
+          />
+        </Route>
+        <Route path="/attendance">
+          <ProtectedRoute 
+            component={Attendance} 
             allowedRoles={["teacher", "officeadmin", "superadmin"]} 
           />
         </Route>

@@ -13,6 +13,7 @@ import {
   insertReminderSchema,
   insertSettingsSchema,
   insertUserSchema,
+  insertAttendanceSchema,
   roleEnum
 } from "@shared/schema";
 import { ZodError } from "zod";
@@ -146,18 +147,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Check if the request has a user property (from an auth middleware)
       const user = (req as any).user;
       
-      // If there's a logged-in user and they are a parent, only show their students
-      if (user && user.role === 'parent') {
-        console.log(`🔍 Filtering students for parent user ID: ${user.id}, username: ${user.username}`);
-        const students = await storage.getStudentsByParent(user.id);
-        console.log(`✅ Found ${students.length} students for parent ${user.username}`);
-        return res.json(students);
+      if (!user) {
+        return res.status(401).json({ message: "Authentication required" });
       }
       
-      // For all other cases (admin, teacher, etc.), show all students
-      console.log(`Getting all students for role: ${user?.role || 'unknown'}`);
-      const students = await storage.getStudents();
+      // Get students based on the user's role
+      console.log(`Getting students for user ID: ${user.id}, role: ${user.role}`);
+      const students = await storage.getStudents(user.id);
       console.log(`Total students returned: ${students.length}`);
+      
       res.json(students);
     } catch (error) {
       console.error("Error fetching students:", error);
@@ -457,7 +455,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Dashboard stats route
   app.get("/api/dashboard/stats", async (req: Request, res: Response) => {
     try {
-      const students = await storage.getStudents();
+      const user = (req as any).user;
+      const students = user ? await storage.getStudents(user.id) : await storage.getStudents();
       const expenses = await storage.getExpenses();
       const inventoryItems = await storage.getInventoryItems();
       
@@ -516,7 +515,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Export routes
   app.get("/api/export/students", async (req: Request, res: Response) => {
     try {
-      const students = await storage.getStudents();
+      const user = (req as any).user;
+      if (!user) {
+        return res.status(401).json({ message: "Authentication required" });
+      }
+      
+      const students = await storage.getStudents(user.id);
       res.json(students);
     } catch (error) {
       console.error("Error exporting students:", error);
@@ -1789,6 +1793,321 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error("❌ OUTER ERROR in create-account endpoint:", outerError);
       const errorMessage = outerError instanceof Error ? outerError.message : String(outerError);
       res.status(500).json({ message: "Fatal error in account creation process", error: errorMessage });
+    }
+  });
+
+  // Teacher-Class association routes
+  app.get("/api/teacher-classes", async (req: Request, res: Response) => {
+    try {
+      const user = (req as any).user;
+      if (!user) {
+        return res.status(401).json({ message: "Authentication required" });
+      }
+      
+      // If teacher, only return their associations
+      if (user.role === 'teacher') {
+        const teacherClasses = await storage.getTeacherClasses(user.id);
+        return res.json(teacherClasses);
+      }
+      
+      // For admin roles, return all teacher-class associations
+      const teacherId = req.query.teacherId ? parseInt(req.query.teacherId as string) : undefined;
+      const teacherClasses = await storage.getTeacherClasses(teacherId);
+      res.json(teacherClasses);
+    } catch (error) {
+      console.error("Error fetching teacher-class associations:", error);
+      res.status(500).json({ message: "Failed to fetch teacher-class associations" });
+    }
+  });
+  
+  app.get("/api/class-teachers/:classId", async (req: Request, res: Response) => {
+    try {
+      const user = (req as any).user;
+      if (!user) {
+        return res.status(401).json({ message: "Authentication required" });
+      }
+      
+      const classId = parseInt(req.params.classId);
+      const classTeachers = await storage.getClassTeachers(classId);
+      res.json(classTeachers);
+    } catch (error) {
+      console.error("Error fetching class teachers:", error);
+      res.status(500).json({ message: "Failed to fetch class teachers" });
+    }
+  });
+  
+  app.post("/api/teacher-classes", async (req: Request, res: Response) => {
+    try {
+      const user = (req as any).user;
+      if (!user) {
+        return res.status(401).json({ message: "Authentication required" });
+      }
+      
+      // Only admins can assign teachers to classes
+      if (!['officeadmin', 'superadmin'].includes(user.role)) {
+        return res.status(403).json({ message: "Only administrators can assign teachers to classes" });
+      }
+      
+      const { teacherId, classId } = req.body;
+      
+      if (!teacherId || !classId) {
+        return res.status(400).json({ message: "Teacher ID and Class ID are required" });
+      }
+      
+      const assignment = await storage.assignTeacherToClass(
+        parseInt(teacherId), 
+        parseInt(classId)
+      );
+      
+      res.status(201).json(assignment);
+    } catch (error) {
+      console.error("Error assigning teacher to class:", error);
+      if (error instanceof Error) {
+        return res.status(400).json({ message: error.message });
+      }
+      res.status(500).json({ message: "Failed to assign teacher to class" });
+    }
+  });
+  
+  app.delete("/api/teacher-classes/:teacherId/:classId", async (req: Request, res: Response) => {
+    try {
+      const user = (req as any).user;
+      if (!user) {
+        return res.status(401).json({ message: "Authentication required" });
+      }
+      
+      // Only admins can remove teachers from classes
+      if (!['officeadmin', 'superadmin'].includes(user.role)) {
+        return res.status(403).json({ message: "Only administrators can remove teachers from classes" });
+      }
+      
+      const teacherId = parseInt(req.params.teacherId);
+      const classId = parseInt(req.params.classId);
+      
+      const success = await storage.removeTeacherFromClass(teacherId, classId);
+      
+      if (!success) {
+        return res.status(404).json({ message: "Teacher-class association not found" });
+      }
+      
+      res.status(204).end();
+    } catch (error) {
+      console.error("Error removing teacher from class:", error);
+      res.status(500).json({ message: "Failed to remove teacher from class" });
+    }
+  });
+  
+  // Attendance management routes
+  app.get("/api/attendance", async (req: Request, res: Response) => {
+    try {
+      const user = (req as any).user;
+      if (!user) {
+        return res.status(401).json({ message: "Authentication required" });
+      }
+      
+      // Check if user has permission to view attendance
+      const canView = await storage.checkPermission(user.role, 'attendance', 'view');
+      if (!canView) {
+        return res.status(403).json({ message: "You don't have permission to view attendance records" });
+      }
+      
+      // Parse query parameters
+      const classId = req.query.classId ? parseInt(req.query.classId as string) : undefined;
+      const date = req.query.date ? new Date(req.query.date as string) : undefined;
+      
+      if (!classId) {
+        return res.status(400).json({ message: "Class ID is required" });
+      }
+      
+      // For teachers, check if they're assigned to this class
+      if (user.role === 'teacher') {
+        const teacherClasses = await storage.getTeacherClasses(user.id);
+        const hasAccess = teacherClasses.some(tc => tc.classId === classId);
+        
+        if (!hasAccess) {
+          return res.status(403).json({ message: "You are not assigned to this class" });
+        }
+      }
+      
+      const attendanceRecords = await storage.getAttendance(classId, date);
+      res.json(attendanceRecords);
+    } catch (error) {
+      console.error("Error fetching attendance records:", error);
+      res.status(500).json({ message: "Failed to fetch attendance records" });
+    }
+  });
+  
+  app.get("/api/attendance/student/:studentId", async (req: Request, res: Response) => {
+    try {
+      const user = (req as any).user;
+      if (!user) {
+        return res.status(401).json({ message: "Authentication required" });
+      }
+      
+      // Check if user has permission to view attendance
+      const canView = await storage.checkPermission(user.role, 'attendance', 'view');
+      if (!canView) {
+        return res.status(403).json({ message: "You don't have permission to view attendance records" });
+      }
+      
+      const studentId = parseInt(req.params.studentId);
+      const startDate = req.query.startDate ? new Date(req.query.startDate as string) : undefined;
+      const endDate = req.query.endDate ? new Date(req.query.endDate as string) : undefined;
+      
+      // For parents, check if they have access to this student
+      if (user.role === 'parent') {
+        const allowedStudents = await storage.getStudentsByParent(user.id);
+        const hasAccess = allowedStudents.some(s => s.id === studentId);
+        
+        if (!hasAccess) {
+          return res.status(403).json({ message: "You don't have access to this student's records" });
+        }
+      }
+      
+      // For teachers, check if this student is in one of their classes
+      if (user.role === 'teacher') {
+        const student = await storage.getStudent(studentId);
+        
+        if (!student || !student.classId) {
+          return res.status(404).json({ message: "Student not found or not assigned to any class" });
+        }
+        
+        const teacherClasses = await storage.getTeacherClasses(user.id);
+        const hasAccess = teacherClasses.some(tc => tc.classId === student.classId);
+        
+        if (!hasAccess) {
+          return res.status(403).json({ message: "You are not assigned to this student's class" });
+        }
+      }
+      
+      const attendanceRecords = await storage.getStudentAttendance(studentId, startDate, endDate);
+      res.json(attendanceRecords);
+    } catch (error) {
+      console.error("Error fetching student attendance records:", error);
+      res.status(500).json({ message: "Failed to fetch student attendance records" });
+    }
+  });
+  
+  app.post("/api/attendance", async (req: Request, res: Response) => {
+    try {
+      const user = (req as any).user;
+      if (!user) {
+        return res.status(401).json({ message: "Authentication required" });
+      }
+      
+      // Check if user has permission to mark attendance
+      const canCreate = await storage.checkPermission(user.role, 'attendance', 'create');
+      if (!canCreate) {
+        return res.status(403).json({ message: "You don't have permission to mark attendance" });
+      }
+      
+      // Parse and validate request data
+      const attendanceData = insertAttendanceSchema.parse({
+        ...req.body,
+        markedById: user.id // Ensure the markedById is the logged-in user
+      });
+      
+      // For teachers, check if they're assigned to this class
+      if (user.role === 'teacher') {
+        const teacherClasses = await storage.getTeacherClasses(user.id);
+        const hasAccess = teacherClasses.some(tc => tc.classId === attendanceData.classId);
+        
+        if (!hasAccess) {
+          return res.status(403).json({ message: "You are not assigned to this class" });
+        }
+      }
+      
+      const attendance = await storage.markAttendance(attendanceData);
+      res.status(201).json(attendance);
+    } catch (error) {
+      console.error("Error marking attendance:", error);
+      if (error instanceof Error) {
+        return res.status(400).json({ message: error.message });
+      }
+      handleZodError(error, res);
+    }
+  });
+  
+  app.patch("/api/attendance/:id", async (req: Request, res: Response) => {
+    try {
+      const user = (req as any).user;
+      if (!user) {
+        return res.status(401).json({ message: "Authentication required" });
+      }
+      
+      // Check if user has permission to update attendance
+      const canEdit = await storage.checkPermission(user.role, 'attendance', 'edit');
+      if (!canEdit) {
+        return res.status(403).json({ message: "You don't have permission to update attendance records" });
+      }
+      
+      const id = parseInt(req.params.id);
+      
+      // Get the existing attendance record
+      const existing = await storage.getAttendance(id);
+      
+      // If it's a teacher, check if they're assigned to this class
+      if (user.role === 'teacher' && existing) {
+        const teacherClasses = await storage.getTeacherClasses(user.id);
+        const hasAccess = teacherClasses.some(tc => tc.classId === existing[0].classId);
+        
+        if (!hasAccess) {
+          return res.status(403).json({ message: "You are not assigned to this class" });
+        }
+      }
+      
+      // Parse and validate the updates
+      const updates = insertAttendanceSchema.partial().parse(req.body);
+      
+      // Apply the update
+      const updatedAttendance = await storage.updateAttendance(id, updates);
+      
+      if (!updatedAttendance) {
+        return res.status(404).json({ message: "Attendance record not found" });
+      }
+      
+      res.json(updatedAttendance);
+    } catch (error) {
+      console.error("Error updating attendance:", error);
+      if (error instanceof Error) {
+        return res.status(400).json({ message: error.message });
+      }
+      handleZodError(error, res);
+    }
+  });
+  
+  app.get("/api/attendance/report/:classId/:month/:year", async (req: Request, res: Response) => {
+    try {
+      const user = (req as any).user;
+      if (!user) {
+        return res.status(401).json({ message: "Authentication required" });
+      }
+      
+      // Check if user has permission to view attendance
+      const canView = await storage.checkPermission(user.role, 'attendance', 'view');
+      if (!canView) {
+        return res.status(403).json({ message: "You don't have permission to view attendance reports" });
+      }
+      
+      const classId = parseInt(req.params.classId);
+      const month = parseInt(req.params.month);
+      const year = parseInt(req.params.year);
+      
+      // For teachers, check if they're assigned to this class
+      if (user.role === 'teacher') {
+        const teacherClasses = await storage.getTeacherClasses(user.id);
+        const hasAccess = teacherClasses.some(tc => tc.classId === classId);
+        
+        if (!hasAccess) {
+          return res.status(403).json({ message: "You are not assigned to this class" });
+        }
+      }
+      
+      const report = await storage.getClassAttendanceReport(classId, month, year);
+      res.json(report);
+    } catch (error) {
+      console.error("Error generating attendance report:", error);
+      res.status(500).json({ message: "Failed to generate attendance report" });
     }
   });
 
