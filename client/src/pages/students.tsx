@@ -32,7 +32,18 @@ export default function Students() {
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   
   const isParent = user?.role === 'parent';
-  const { canCreate: canCreateStudent, canEdit: canEditStudent, canDelete: canDeleteStudent } = useModulePermission('students');
+  const studentPermissions = useModulePermission('students');
+  const canCreateStudent = studentPermissions.canCreate;
+  const canEditStudent = studentPermissions.canEdit;
+  const canDeleteStudent = studentPermissions.canDelete;
+  
+  console.log('🔴 STUDENT PERMISSIONS 🔴', {
+    role: user?.role,
+    studentPermissions,
+    canCreateStudent,
+    canEditStudent,
+    canDeleteStudent
+  });
 
   // Fetch students
   const { data: students, isLoading: isLoadingStudents } = useQuery<Student[]>({
