@@ -26,7 +26,9 @@ import {
   type TeacherClass,
   type InsertTeacherClass,
   type Attendance,
-  type InsertAttendance
+  type InsertAttendance,
+  type AcademicYear,
+  type InsertAcademicYear
 } from "@shared/schema";
 
 // Storage interface
@@ -158,6 +160,16 @@ export interface IStorage {
   markAttendance(attendance: InsertAttendance): Promise<Attendance>;
   updateAttendance(id: number, attendance: Partial<InsertAttendance>): Promise<Attendance | undefined>;
   getClassAttendanceReport(classId: number, month: number, year: number): Promise<any[]>;
+  
+  // Academic Year methods
+  getAllAcademicYears(): Promise<AcademicYear[]>;
+  getCurrentAcademicYear(): Promise<AcademicYear | undefined>;
+  getAcademicYearById(id: number): Promise<AcademicYear | undefined>;
+  createAcademicYear(data: InsertAcademicYear): Promise<AcademicYear>;
+  updateAcademicYear(id: number, data: Partial<InsertAcademicYear>): Promise<AcademicYear | undefined>;
+  deleteAcademicYear(id: number): Promise<boolean>;
+  updateAllAcademicYearsToNotCurrent(): Promise<void>;
+  checkAcademicYearReferences(id: number): Promise<boolean>;
 }
 
 export class MemStorage implements IStorage {
@@ -175,6 +187,7 @@ export class MemStorage implements IStorage {
   private rolePermissions: Map<number, RolePermission>;
   private teacherClasses: Map<string, TeacherClass>; // Key: teacherId-classId
   private attendance: Map<number, Attendance>;
+  private academicYears: Map<number, AcademicYear>;
   
   private studentId: number;
   private expenseId: number;
@@ -189,6 +202,7 @@ export class MemStorage implements IStorage {
   private userId: number;
   private rolePermissionId: number;
   private attendanceId: number;
+  private academicYearId: number;
 
   constructor() {
     this.students = new Map();
@@ -205,6 +219,7 @@ export class MemStorage implements IStorage {
     this.rolePermissions = new Map();
     this.teacherClasses = new Map();
     this.attendance = new Map();
+    this.academicYears = new Map();
     
     this.studentId = 1;
     this.expenseId = 1;
@@ -219,6 +234,7 @@ export class MemStorage implements IStorage {
     this.userId = 1;
     this.rolePermissionId = 1;
     this.attendanceId = 1;
+    this.academicYearId = 1;
     
     // Initialize with sample data asynchronously
     setTimeout(() => {
@@ -573,17 +589,24 @@ export class MemStorage implements IStorage {
     const id = this.studentId++;
     const now = new Date();
     const student: Student = { 
-      ...insertStudent, 
-      id, 
-      createdAt: now,
-      // Ensure correct null types for optional fields
-      email: insertStudent.email || null,
+      id,
+      fullName: insertStudent.fullName,
+      dateOfBirth: insertStudent.dateOfBirth,
+      age: insertStudent.age || null,
+      gender: insertStudent.gender,
+      guardianName: insertStudent.guardianName,
+      phone: insertStudent.phone,
+      email: insertStudent.email,
       address: insertStudent.address || null,
-      notes: insertStudent.notes || null,
+      city: insertStudent.city || null,
+      postalCode: insertStudent.postalCode || null,
+      state: insertStudent.state || null,
+      country: insertStudent.country || null,
+      status: insertStudent.status || "active",
       classId: insertStudent.classId || null,
       feeStructureId: insertStudent.feeStructureId || null,
-      age: insertStudent.age || null,
-      status: insertStudent.status || "active"
+      notes: insertStudent.notes || null,
+      createdAt: now
     };
     this.students.set(id, student);
     
@@ -1659,13 +1682,15 @@ export class MemStorage implements IStorage {
           
           markedCount++;
         } catch (err) {
-          console.error(`Error marking attendance for student ${student.fullName}: ${err.message}`);
+          const errorMessage = err instanceof Error ? err.message : String(err);
+          console.error(`Error marking attendance for student ${student.fullName}: ${errorMessage}`);
         }
       }
       
       console.log(`Created attendance records for ${markedCount} students over 2 days`);
     } catch (error) {
-      console.error("Error initializing attendance records:", error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.error("Error initializing attendance records:", errorMessage);
     }
   }
   
@@ -1790,21 +1815,44 @@ export class MemStorage implements IStorage {
       description: "Default currency for fees and expenses"
     });
     
+    // Initial academic years
+    const academicYears = [
+      {
+        name: "2023-2024",
+        startDate: "2023-08-01",
+        endDate: "2024-05-31",
+        isCurrent: true
+      },
+      {
+        name: "2024-2025",
+        startDate: "2024-08-01",
+        endDate: "2025-05-31",
+        isCurrent: false
+      }
+    ];
+    
+    // Create academic years and collect their IDs
+    const academicYearIds: Record<string, number> = {};
+    for (const yearData of academicYears) {
+      const newYear = await this.createAcademicYear(yearData);
+      academicYearIds[newYear.name] = newYear.id;
+    }
+    
     // Initial classes
     const classes = [
       {
         name: "Toddler Group",
-        academicYear: "2023-2024",
+        academicYearId: academicYearIds["2023-2024"],
         description: "Ages 2-3 years"
       },
       {
         name: "Preschool Group",
-        academicYear: "2023-2024",
+        academicYearId: academicYearIds["2023-2024"],
         description: "Ages 3-4 years"
       },
       {
         name: "Kindergarten Ready",
-        academicYear: "2023-2024",
+        academicYearId: academicYearIds["2023-2024"],
         description: "Ages 4-5 years"
       }
     ];
@@ -1822,21 +1870,21 @@ export class MemStorage implements IStorage {
         name: "Standard Tuition - Toddler",
         classId: classIds[0],
         totalAmount: "4500.00",
-        academicYear: "2023-2024",
+        academicYearId: academicYearIds["2023-2024"],
         description: "Standard fee structure for toddler group"
       },
       {
         name: "Standard Tuition - Preschool",
         classId: classIds[1],
         totalAmount: "5000.00",
-        academicYear: "2023-2024",
+        academicYearId: academicYearIds["2023-2024"],
         description: "Standard fee structure for preschool group"
       },
       {
         name: "Standard Tuition - Kindergarten Ready",
         classId: classIds[2],
         totalAmount: "5500.00",
-        academicYear: "2023-2024",
+        academicYearId: academicYearIds["2023-2024"],
         description: "Standard fee structure for kindergarten ready group"
       }
     ];
@@ -2400,6 +2448,125 @@ export class MemStorage implements IStorage {
     });
     
     return studentAttendance;
+  }
+
+  // Academic Year methods
+  async getAllAcademicYears(): Promise<AcademicYear[]> {
+    return Array.from(this.academicYears.values()).sort((a, b) => b.id - a.id);
+  }
+
+  async getCurrentAcademicYear(): Promise<AcademicYear | undefined> {
+    return Array.from(this.academicYears.values()).find(year => year.isCurrent);
+  }
+
+  async getAcademicYearById(id: number): Promise<AcademicYear | undefined> {
+    return this.academicYears.get(id);
+  }
+
+  async createAcademicYear(data: InsertAcademicYear): Promise<AcademicYear> {
+    const id = this.academicYearId++;
+    const now = new Date();
+    
+    // If this is set as current academic year, update all others to not current
+    if (data.isCurrent) {
+      await this.updateAllAcademicYearsToNotCurrent();
+    }
+    
+    const academicYear: AcademicYear = {
+      id,
+      name: data.name,
+      startDate: data.startDate,
+      endDate: data.endDate,
+      isCurrent: data.isCurrent === true ? true : false,
+      createdAt: now,
+      updatedAt: now
+    };
+    
+    this.academicYears.set(id, academicYear);
+    
+    // Log activity
+    this.createActivity({
+      type: 'academic_year',
+      action: 'create',
+      details: { academicYearId: id, name: academicYear.name }
+    });
+    
+    return academicYear;
+  }
+
+  async updateAcademicYear(id: number, data: Partial<InsertAcademicYear>): Promise<AcademicYear | undefined> {
+    const academicYear = this.academicYears.get(id);
+    if (!academicYear) return undefined;
+    
+    // If setting this as current academic year, update all others to not current
+    if (data.isCurrent) {
+      await this.updateAllAcademicYearsToNotCurrent();
+    }
+    
+    const updatedAcademicYear = { ...academicYear, ...data };
+    this.academicYears.set(id, updatedAcademicYear);
+    
+    // Log activity
+    this.createActivity({
+      type: 'academic_year',
+      action: 'update',
+      details: { academicYearId: id, name: updatedAcademicYear.name }
+    });
+    
+    return updatedAcademicYear;
+  }
+
+  async updateAllAcademicYearsToNotCurrent(): Promise<void> {
+    this.academicYears.forEach(year => {
+      if (year.isCurrent) {
+        year.isCurrent = false;
+        this.academicYears.set(year.id, year);
+      }
+    });
+  }
+
+  async checkAcademicYearReferences(id: number): Promise<boolean> {
+    // Check if any classes reference this academic year
+    const classesWithAcademicYear = Array.from(this.classes.values())
+      .filter(classItem => classItem.academicYearId === id);
+    
+    if (classesWithAcademicYear.length > 0) {
+      return true;
+    }
+    
+    // Check if any fee structures reference this academic year
+    const feeStructuresWithAcademicYear = Array.from(this.feeStructures.values())
+      .filter(fee => fee.academicYearId === id);
+    
+    if (feeStructuresWithAcademicYear.length > 0) {
+      return true;
+    }
+    
+    return false;
+  }
+
+  async deleteAcademicYear(id: number): Promise<boolean> {
+    const academicYear = this.academicYears.get(id);
+    if (!academicYear) return false;
+    
+    // Check if there are any references to this academic year
+    const hasReferences = await this.checkAcademicYearReferences(id);
+    if (hasReferences) {
+      return false; // Cannot delete academic year that is being referenced
+    }
+    
+    const success = this.academicYears.delete(id);
+    
+    if (success) {
+      // Log activity
+      this.createActivity({
+        type: 'academic_year',
+        action: 'delete',
+        details: { academicYearId: id, name: academicYear.name }
+      });
+    }
+    
+    return success;
   }
 }
 

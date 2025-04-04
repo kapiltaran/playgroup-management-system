@@ -16,7 +16,8 @@ export const moduleEnum = pgEnum('module', [
   'settings',
   'user_management',
   'role_management',
-  'attendance'
+  'attendance',
+  'academic_year'
 ]);
 
 // Class schema
@@ -24,7 +25,7 @@ export const classes = pgTable("classes", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
   description: text("description"),
-  academicYear: text("academic_year").notNull(),
+  academicYearId: integer("academic_year_id").notNull().references(() => academicYears.id),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -39,7 +40,7 @@ export const feeStructures = pgTable("fee_structures", {
   name: text("name").notNull(),
   classId: integer("class_id").notNull().references(() => classes.id),
   totalAmount: numeric("total_amount", { precision: 10, scale: 2 }).notNull(),
-  academicYear: text("academic_year").notNull(),
+  academicYearId: integer("academic_year_id").notNull().references(() => academicYears.id),
   description: text("description"),
   createdAt: timestamp("created_at").defaultNow(),
 });
@@ -262,6 +263,23 @@ export const insertTeacherClassSchema = createInsertSchema(teacherClasses).omit(
   assignedDate: true,
 });
 
+// Academic Year schema
+export const academicYears = pgTable("academic_years", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull().unique(), // e.g., "2024-2025"
+  startDate: date("start_date").notNull(),
+  endDate: date("end_date").notNull(),
+  isCurrent: boolean("is_current").notNull().default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertAcademicYearSchema = createInsertSchema(academicYears).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 // Attendance schema
 export const attendance = pgTable("attendance", {
   id: serial("id").primaryKey(),
@@ -310,3 +328,5 @@ export type Setting = typeof settings.$inferSelect;
 export type InsertSetting = z.infer<typeof insertSettingsSchema>;
 export type RolePermission = typeof rolePermissions.$inferSelect;
 export type InsertRolePermission = z.infer<typeof insertRolePermissionSchema>;
+export type AcademicYear = typeof academicYears.$inferSelect;
+export type InsertAcademicYear = z.infer<typeof insertAcademicYearSchema>;

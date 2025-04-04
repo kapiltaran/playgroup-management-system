@@ -14,6 +14,7 @@ import {
   insertSettingsSchema,
   insertUserSchema,
   insertAttendanceSchema,
+  insertAcademicYearSchema,
   roleEnum
 } from "@shared/schema";
 import { ZodError } from "zod";
@@ -1363,6 +1364,143 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error deleting setting:", error);
       res.status(500).json({ message: "Failed to delete setting" });
+    }
+  });
+  
+  // Academic Years endpoints
+  app.get("/api/academic-years", async (req: Request, res: Response) => {
+    try {
+      const academicYears = await storage.getAllAcademicYears();
+      res.json(academicYears);
+    } catch (error) {
+      handleZodError(error, res);
+    }
+  });
+  
+  app.get("/api/academic-years/current", async (req: Request, res: Response) => {
+    try {
+      const currentYear = await storage.getCurrentAcademicYear();
+      if (!currentYear) {
+        return res.status(404).json({ message: "No current academic year found" });
+      }
+      res.json(currentYear);
+    } catch (error) {
+      handleZodError(error, res);
+    }
+  });
+  
+  app.get("/api/academic-years/:id", async (req: Request, res: Response) => {
+    try {
+      const academicYear = await storage.getAcademicYearById(parseInt(req.params.id));
+      if (!academicYear) {
+        return res.status(404).json({ message: "Academic year not found" });
+      }
+      res.json(academicYear);
+    } catch (error) {
+      handleZodError(error, res);
+    }
+  });
+  
+  app.post("/api/academic-years", async (req: Request, res: Response) => {
+    try {
+      // Check if user is superadmin
+      const user = (req as any).user;
+      if (!user || user.role !== 'superadmin') {
+        return res.status(403).json({ message: "Only superadmins can manage academic years" });
+      }
+      
+      const parsedData = insertAcademicYearSchema.parse(req.body);
+      
+      // If this academic year is set as current, update all others to not be current
+      if (parsedData.isCurrent) {
+        await storage.updateAllAcademicYearsToNotCurrent();
+      }
+      
+      const academicYear = await storage.createAcademicYear(parsedData);
+      
+      // Log activity
+      await storage.createActivity({
+        type: 'settings',
+        action: 'create',
+        details: { academicYear: academicYear.name }
+      });
+      
+      res.status(201).json(academicYear);
+    } catch (error) {
+      handleZodError(error, res);
+    }
+  });
+  
+  app.patch("/api/academic-years/:id", async (req: Request, res: Response) => {
+    try {
+      // Check if user is superadmin
+      const user = (req as any).user;
+      if (!user || user.role !== 'superadmin') {
+        return res.status(403).json({ message: "Only superadmins can manage academic years" });
+      }
+      
+      const id = parseInt(req.params.id);
+      const parsedData = insertAcademicYearSchema.parse(req.body);
+      
+      // If this academic year is set as current, update all others to not be current
+      if (parsedData.isCurrent) {
+        await storage.updateAllAcademicYearsToNotCurrent();
+      }
+      
+      const academicYear = await storage.updateAcademicYear(id, parsedData);
+      
+      if (!academicYear) {
+        return res.status(404).json({ message: "Academic year not found" });
+      }
+      
+      // Log activity
+      await storage.createActivity({
+        type: 'settings',
+        action: 'update',
+        details: { academicYear: academicYear.name }
+      });
+      
+      res.json(academicYear);
+    } catch (error) {
+      handleZodError(error, res);
+    }
+  });
+  
+  app.delete("/api/academic-years/:id", async (req: Request, res: Response) => {
+    try {
+      // Check if user is superadmin
+      const user = (req as any).user;
+      if (!user || user.role !== 'superadmin') {
+        return res.status(403).json({ message: "Only superadmins can manage academic years" });
+      }
+      
+      const id = parseInt(req.params.id);
+      
+      // Check if any classes or fee structures reference this academic year
+      const hasReferences = await storage.checkAcademicYearReferences(id);
+      
+      if (hasReferences) {
+        return res.status(400).json({ 
+          message: "Cannot delete academic year that is referenced by classes or fee structures" 
+        });
+      }
+      
+      const deleted = await storage.deleteAcademicYear(id);
+      
+      if (!deleted) {
+        return res.status(404).json({ message: "Academic year not found" });
+      }
+      
+      // Log activity
+      await storage.createActivity({
+        type: 'settings',
+        action: 'delete',
+        details: { academicYearId: id }
+      });
+      
+      res.json({ message: "Academic year deleted successfully" });
+    } catch (error) {
+      handleZodError(error, res);
     }
   });
 
