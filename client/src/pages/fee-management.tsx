@@ -48,8 +48,9 @@ export default function FeeManagement() {
     dueDate: formattedDate
   });
   
-  // Selected academic year for filtering
+  // Selected academic year and class for filtering
   const [selectedAcademicYearId, setSelectedAcademicYearId] = useState<number | null>(null);
+  const [selectedFilterClassId, setSelectedFilterClassId] = useState<number | null>(null);
   
   // Fetch academic years for dropdown
   const { data: academicYears, isLoading: isLoadingAcademicYears } = useQuery<AcademicYear[]>({
@@ -59,12 +60,14 @@ export default function FeeManagement() {
   // Fetch current academic year for default selection
   const { data: currentAcademicYear } = useQuery<AcademicYear>({
     queryKey: ["/api/academic-years/current"],
-    onSuccess: (data) => {
-      if (data && !selectedAcademicYearId) {
-        setSelectedAcademicYearId(data.id);
-      }
-    }
   });
+  
+  // Set the selected academic year when current academic year loads
+  useEffect(() => {
+    if (currentAcademicYear && !selectedAcademicYearId) {
+      setSelectedAcademicYearId(currentAcademicYear.id);
+    }
+  }, [currentAcademicYear, selectedAcademicYearId]);
 
   // Fetch classes for dropdown, filtered by selected academic year
   const { data: allClasses } = useQuery<Class[]>({
@@ -83,12 +86,25 @@ export default function FeeManagement() {
     queryKey: ["/api/fee-structures"],
   });
   
-  // Filter fee structures by selected academic year
+  // Filter fee structures by selected academic year and class
   const filteredFeeStructures = useMemo(() => {
     if (!feeStructures) return [];
-    if (!selectedAcademicYearId) return feeStructures;
-    return feeStructures.filter(s => s.academicYearId === selectedAcademicYearId);
-  }, [feeStructures, selectedAcademicYearId]);
+    
+    // Start with all fee structures
+    let filtered = feeStructures;
+    
+    // Apply academic year filter if selected
+    if (selectedAcademicYearId) {
+      filtered = filtered.filter(s => s.academicYearId === selectedAcademicYearId);
+    }
+    
+    // Apply class filter if selected
+    if (selectedFilterClassId) {
+      filtered = filtered.filter(s => s.classId === selectedFilterClassId);
+    }
+    
+    return filtered;
+  }, [feeStructures, selectedAcademicYearId, selectedFilterClassId]);
 
   // Fetch fee installments
   const { data: allInstallments, isLoading: isLoadingInstallments } = useQuery<FeeInstallment[]>({
@@ -525,7 +541,11 @@ export default function FeeManagement() {
               <h2 className="text-xl font-semibold">Fee Structures</h2>
               <Select 
                 value={selectedAcademicYearId?.toString() || "all"} 
-                onValueChange={(value) => setSelectedAcademicYearId(value !== "all" ? parseInt(value) : null)}
+                onValueChange={(value) => {
+                  setSelectedAcademicYearId(value !== "all" ? parseInt(value) : null);
+                  // Reset class filter when academic year changes
+                  setSelectedFilterClassId(null);
+                }}
               >
                 <SelectTrigger className="w-[250px]">
                   <SelectValue placeholder="Filter by Academic Year" />
@@ -535,6 +555,24 @@ export default function FeeManagement() {
                   {academicYears?.map((year) => (
                     <SelectItem key={year.id} value={year.id.toString()}>
                       {year.name} {year.isCurrent && "(Current)"}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              
+              <Select 
+                value={selectedFilterClassId?.toString() || "all"} 
+                onValueChange={(value) => setSelectedFilterClassId(value !== "all" ? parseInt(value) : null)}
+                disabled={!selectedAcademicYearId}
+              >
+                <SelectTrigger className="w-[200px]">
+                  <SelectValue placeholder="Filter by Class" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Classes</SelectItem>
+                  {classes?.map((classItem) => (
+                    <SelectItem key={classItem.id} value={classItem.id.toString()}>
+                      {classItem.name}
                     </SelectItem>
                   ))}
                 </SelectContent>
