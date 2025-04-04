@@ -1,7 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { format } from "date-fns";
-import { PencilIcon, TrashIcon, PlusCircleIcon, LayersIcon, CalendarIcon } from "lucide-react";
+import { PencilIcon, TrashIcon, PlusCircleIcon, LayersIcon, CalendarIcon, CopyIcon } from "lucide-react";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/ui/data-table";
@@ -14,7 +14,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import type { FeeStructure, FeeInstallment, Class } from "@shared/schema";
+import type { FeeStructure, FeeInstallment, Class, AcademicYear } from "@shared/schema";
 
 export default function FeeManagement() {
   const { toast } = useToast();
@@ -22,13 +22,13 @@ export default function FeeManagement() {
   
   // Fee Structure state
   const [isStructureFormOpen, setIsStructureFormOpen] = useState(false);
-  const [structureFormMode, setStructureFormMode] = useState<"add" | "edit">("add");
+  const [structureFormMode, setStructureFormMode] = useState<"add" | "edit" | "clone">("add");
   const [currentStructure, setCurrentStructure] = useState<FeeStructure | null>(null);
   const [structureFormData, setStructureFormData] = useState({
     name: "",
     classId: 0,
+    academicYearId: 0,
     totalAmount: "",
-    academicYear: "",
     description: ""
   });
 
@@ -47,16 +47,48 @@ export default function FeeManagement() {
     amount: "",
     dueDate: formattedDate
   });
-
-  // Fetch classes for dropdown
-  const { data: classes } = useQuery<Class[]>({
-    queryKey: ["/api/classes"],
+  
+  // Selected academic year for filtering
+  const [selectedAcademicYearId, setSelectedAcademicYearId] = useState<number | null>(null);
+  
+  // Fetch academic years for dropdown
+  const { data: academicYears, isLoading: isLoadingAcademicYears } = useQuery<AcademicYear[]>({
+    queryKey: ["/api/academic-years"],
+  });
+  
+  // Fetch current academic year for default selection
+  const { data: currentAcademicYear } = useQuery<AcademicYear>({
+    queryKey: ["/api/academic-years/current"],
+    onSuccess: (data) => {
+      if (data && !selectedAcademicYearId) {
+        setSelectedAcademicYearId(data.id);
+      }
+    }
   });
 
+  // Fetch classes for dropdown, filtered by selected academic year
+  const { data: allClasses } = useQuery<Class[]>({
+    queryKey: ["/api/classes"],
+  });
+  
+  // Filter classes by selected academic year
+  const classes = useMemo(() => {
+    if (!allClasses) return [];
+    if (!selectedAcademicYearId) return allClasses;
+    return allClasses.filter(c => c.academicYearId === selectedAcademicYearId);
+  }, [allClasses, selectedAcademicYearId]);
+  
   // Fetch fee structures
   const { data: feeStructures, isLoading: isLoadingStructures } = useQuery<FeeStructure[]>({
     queryKey: ["/api/fee-structures"],
   });
+  
+  // Filter fee structures by selected academic year
+  const filteredFeeStructures = useMemo(() => {
+    if (!feeStructures) return [];
+    if (!selectedAcademicYearId) return feeStructures;
+    return feeStructures.filter(s => s.academicYearId === selectedAcademicYearId);
+  }, [feeStructures, selectedAcademicYearId]);
 
   // Fetch fee installments
   const { data: allInstallments, isLoading: isLoadingInstallments } = useQuery<FeeInstallment[]>({
@@ -72,12 +104,52 @@ export default function FeeManagement() {
   const addStructureMutation = useMutation({
     mutationFn: (data: any) => 
       apiRequest("POST", "/api/fee-structures", data),
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/fee-structures"] });
-      toast({
-        title: "Success",
-        description: "Fee structure added successfully",
-      });
+      
+      // Check if we need to clone installments (from localStorage)
+      const installmentsToCloneStr = localStorage.getItem('installmentsToClone');
+      if (installmentsToCloneStr && structureFormMode === "clone") {
+        try {
+          const installmentsToClone = JSON.parse(installmentsToCloneStr) as FeeInstallment[];
+          // Clear the storage immediately to avoid duplicate operations
+          localStorage.removeItem('installmentsToClone');
+          
+          if (installmentsToClone.length > 0) {
+            // Clone each installment to the new fee structure
+            installmentsToClone.forEach(installment => {
+              const newInstallment = {
+                feeStructureId: data.id, // New structure ID
+                name: installment.name,
+                amount: installment.amount,
+                dueDate: installment.dueDate
+              };
+              
+              // Create the new installment
+              apiRequest("POST", "/api/fee-installments", newInstallment)
+                .catch(error => console.error("Error cloning installment:", error));
+            });
+            
+            // Invalidate installments after cloning
+            queryClient.invalidateQueries({ queryKey: ["/api/fee-installments"] });
+            
+            // Show success message for cloning
+            toast({
+              title: "Success",
+              description: `Fee structure and ${installmentsToClone.length} installments cloned successfully`,
+            });
+          }
+        } catch (error) {
+          console.error("Error parsing installments to clone:", error);
+        }
+      } else {
+        // Show regular success message
+        toast({
+          title: "Success",
+          description: "Fee structure added successfully",
+        });
+      }
+      
       setIsStructureFormOpen(false);
       resetStructureForm();
     },
@@ -201,8 +273,8 @@ export default function FeeManagement() {
     setStructureFormData({
       name: "",
       classId: 0,
+      academicYearId: selectedAcademicYearId || 0,
       totalAmount: "",
-      academicYear: "",
       description: ""
     });
     setCurrentStructure(null);
@@ -230,8 +302,22 @@ export default function FeeManagement() {
     setStructureFormData({
       name: structure.name,
       classId: structure.classId,
+      academicYearId: structure.academicYearId,
       totalAmount: structure.totalAmount,
-      academicYear: structure.academicYear,
+      description: structure.description || ""
+    });
+    setIsStructureFormOpen(true);
+  };
+  
+  // Handle clone fee structure (for cloning between academic years)
+  const handleCloneFeeStructure = (structure: FeeStructure) => {
+    setStructureFormMode("clone");
+    setCurrentStructure(structure);
+    setStructureFormData({
+      name: `Copy of ${structure.name}`,
+      classId: 0, // Will need to be selected by user
+      academicYearId: selectedAcademicYearId || 0,
+      totalAmount: structure.totalAmount,
       description: structure.description || ""
     });
     setIsStructureFormOpen(true);
@@ -248,13 +334,45 @@ export default function FeeManagement() {
   const handleStructureSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
+    // Validate the form data
+    if (structureFormData.academicYearId === 0) {
+      toast({
+        title: "Validation Error",
+        description: "Please select an academic year",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    if (structureFormData.classId === 0) {
+      toast({
+        title: "Validation Error",
+        description: "Please select a class",
+        variant: "destructive",
+      });
+      return;
+    }
+    
     const formDataToSubmit = {
       ...structureFormData,
       totalAmount: structureFormData.totalAmount.toString()
     };
     
-    if (structureFormMode === "add") {
+    if (structureFormMode === "add" || structureFormMode === "clone") {
+      // Both add and clone create a new fee structure
       addStructureMutation.mutate(formDataToSubmit);
+      
+      // If cloning, we may want to also copy the installments
+      if (structureFormMode === "clone" && currentStructure) {
+        // Get installments for the current fee structure
+        const installmentsToClone = allInstallments?.filter(
+          installment => installment.feeStructureId === currentStructure.id
+        );
+        
+        // We need to wait for the new structure to be created before adding installments
+        // This will happen in onSuccess of the mutation
+        localStorage.setItem('installmentsToClone', JSON.stringify(installmentsToClone || []));
+      }
     } else {
       if (currentStructure) {
         updateStructureMutation.mutate({ 
@@ -323,6 +441,16 @@ export default function FeeManagement() {
   const handleInstallmentSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
+    // Validate the form data
+    if (installmentFormData.feeStructureId === 0) {
+      toast({
+        title: "Validation Error",
+        description: "Please select a fee structure",
+        variant: "destructive",
+      });
+      return;
+    }
+    
     const formDataToSubmit = {
       ...installmentFormData,
       amount: installmentFormData.amount.toString()
@@ -372,6 +500,12 @@ export default function FeeManagement() {
     const structure = feeStructures?.find(s => s.id === structureId);
     return structure ? structure.name : "Unknown Structure";
   };
+  
+  // Get academic year name by id
+  const getAcademicYearName = (yearId: number) => {
+    const year = academicYears?.find(y => y.id === yearId);
+    return year ? year.name : "Unknown Year";
+  };
 
   return (
     <div className="max-w-7xl mx-auto">
@@ -386,8 +520,26 @@ export default function FeeManagement() {
         </TabsList>
 
         <TabsContent value="structures" className="mt-4">
-          <div className="flex justify-between mb-4">
-            <h2 className="text-xl font-semibold">Fee Structures</h2>
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center space-x-4">
+              <h2 className="text-xl font-semibold">Fee Structures</h2>
+              <Select 
+                value={selectedAcademicYearId?.toString() || "all"} 
+                onValueChange={(value) => setSelectedAcademicYearId(value !== "all" ? parseInt(value) : null)}
+              >
+                <SelectTrigger className="w-[250px]">
+                  <SelectValue placeholder="Filter by Academic Year" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Academic Years</SelectItem>
+                  {academicYears?.map((year) => (
+                    <SelectItem key={year.id} value={year.id.toString()}>
+                      {year.name} {year.isCurrent && "(Current)"}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
             <Button onClick={() => {
               setStructureFormMode("add");
               resetStructureForm();
@@ -399,7 +551,7 @@ export default function FeeManagement() {
 
           <div className="bg-white shadow rounded-lg">
             <DataTable
-              data={feeStructures || []}
+              data={filteredFeeStructures || []}
               isLoading={isLoadingStructures}
               searchKey="name"
               columns={[
@@ -427,10 +579,10 @@ export default function FeeManagement() {
                   )
                 },
                 {
-                  accessorKey: "academicYear",
+                  accessorKey: "academicYearId",
                   header: "Academic Year",
                   cell: (item) => (
-                    <div className="text-sm text-gray-700">{item.academicYear}</div>
+                    <div className="text-sm text-gray-700">{getAcademicYearName(item.academicYearId)}</div>
                   )
                 },
                 {
@@ -448,12 +600,26 @@ export default function FeeManagement() {
                       >
                         <LayersIcon className="h-4 w-4" />
                       </Button>
-                      <Button variant="outline" size="sm" onClick={() => handleEditStructure(item)}>
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        title="Clone Fee Structure"
+                        onClick={() => handleCloneFeeStructure(item)}
+                      >
+                        <CopyIcon className="h-4 w-4" />
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        title="Edit Fee Structure"
+                        onClick={() => handleEditStructure(item)}
+                      >
                         <PencilIcon className="h-4 w-4" />
                       </Button>
                       <Button 
                         variant="destructive" 
-                        size="sm" 
+                        size="sm"
+                        title="Delete Fee Structure"
                         onClick={() => handleDeleteStructure(item.id)}
                       >
                         <TrashIcon className="h-4 w-4" />
@@ -479,9 +645,9 @@ export default function FeeManagement() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Fee Structures</SelectItem>
-                  {feeStructures?.map((structure) => (
+                  {(selectedAcademicYearId ? filteredFeeStructures : feeStructures)?.map((structure) => (
                     <SelectItem key={structure.id} value={structure.id.toString()}>
-                      {structure.name}
+                      {structure.name} - {getAcademicYearName(structure.academicYearId)}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -561,10 +727,7 @@ export default function FeeManagement() {
                         title="Clone Installment" 
                         onClick={() => handleCloneInstallment(item)}
                       >
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <rect x="8" y="8" width="12" height="12" rx="2" ry="2" />
-                          <path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2" />
-                        </svg>
+                        <CopyIcon className="h-4 w-4" />
                       </Button>
                       <Button 
                         variant="outline" 
@@ -596,17 +759,50 @@ export default function FeeManagement() {
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>
-              {structureFormMode === "add" ? "Add Fee Structure" : "Edit Fee Structure"}
+              {structureFormMode === "add" 
+                ? "Add Fee Structure" 
+                : structureFormMode === "clone" 
+                  ? "Clone Fee Structure" 
+                  : "Edit Fee Structure"}
             </DialogTitle>
             <DialogDescription>
               {structureFormMode === "add" 
                 ? "Create a new fee structure for a class." 
-                : "Update the details of this fee structure."}
+                : structureFormMode === "clone"
+                  ? "Clone an existing fee structure to another academic year or class."
+                  : "Update the details of this fee structure."}
             </DialogDescription>
           </DialogHeader>
 
           <form onSubmit={handleStructureSubmit} className="space-y-4">
             <div className="grid grid-cols-1 gap-4">
+              {/* Academic Year selector - first! */}
+              <div className="space-y-2">
+                <Label htmlFor="academicYearId">Academic Year</Label>
+                <Select 
+                  value={structureFormData.academicYearId.toString()} 
+                  onValueChange={(value) => {
+                    const yearId = parseInt(value);
+                    setStructureFormData(prev => ({
+                      ...prev,
+                      academicYearId: yearId
+                    }));
+                    setSelectedAcademicYearId(yearId);
+                  }}
+                >
+                  <SelectTrigger id="academicYearId">
+                    <SelectValue placeholder="Select academic year" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {academicYears?.map((year) => (
+                      <SelectItem key={year.id} value={year.id.toString()}>
+                        {year.name} {year.isCurrent && "(Current)"}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            
               <div className="space-y-2">
                 <Label htmlFor="name">Structure Name</Label>
                 <Input
@@ -663,18 +859,6 @@ export default function FeeManagement() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="academicYear">Academic Year</Label>
-                <Input
-                  id="academicYear"
-                  name="academicYear"
-                  value={structureFormData.academicYear}
-                  onChange={handleStructureInputChange}
-                  placeholder="e.g., 2023-2024"
-                  required
-                />
-              </div>
-
-              <div className="space-y-2">
                 <Label htmlFor="description">Description (Optional)</Label>
                 <Textarea
                   id="description"
@@ -702,7 +886,11 @@ export default function FeeManagement() {
                 type="submit"
                 disabled={addStructureMutation.isPending || updateStructureMutation.isPending}
               >
-                {structureFormMode === "add" ? "Add Structure" : "Update Structure"}
+                {structureFormMode === "add" 
+                  ? "Add Structure" 
+                  : structureFormMode === "clone" 
+                    ? "Clone Structure" 
+                    : "Update Structure"}
               </Button>
             </DialogFooter>
           </form>
@@ -741,9 +929,9 @@ export default function FeeManagement() {
                       <SelectValue placeholder="Select a fee structure" />
                     </SelectTrigger>
                     <SelectContent>
-                      {feeStructures?.map((structure) => (
+                      {(selectedAcademicYearId ? filteredFeeStructures : feeStructures)?.map((structure) => (
                         <SelectItem key={structure.id} value={structure.id.toString()}>
-                          {structure.name}
+                          {structure.name} - {getAcademicYearName(structure.academicYearId)}
                         </SelectItem>
                       ))}
                     </SelectContent>
