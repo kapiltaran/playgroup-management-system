@@ -13,7 +13,8 @@ import {
   ShieldIcon,
   UserCogIcon,
   LogOutIcon,
-  CalendarCheckIcon
+  CalendarCheckIcon,
+  CalendarIcon
 } from "lucide-react";
 import { useAuth } from "@/context/auth-context";
 
@@ -89,6 +90,12 @@ export default function Sidebar({ setOpen }: SidebarProps) {
       href: "/settings",
       label: "Settings",
       icon: <SettingsIcon className="text-xl mr-3" />,
+      roles: ["superadmin"]
+    },
+    {
+      href: "/academic-years",
+      label: "Academic Years",
+      icon: <CalendarIcon className="text-xl mr-3" />,
       roles: ["superadmin"]
     },
   ];

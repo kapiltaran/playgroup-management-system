@@ -5,7 +5,7 @@ import { useAuth } from '@/context/auth-context';
 
 interface ModulePermissionGateProps {
   moduleName: ModuleType;
-  permission: 'view' | 'create' | 'edit' | 'delete';
+  permission: 'view' | 'create' | 'edit' | 'delete' | 'canView' | 'canCreate' | 'canEdit' | 'canUpdate' | 'canDelete';
   children: ReactNode;
   fallback?: ReactNode;
 }
@@ -51,12 +51,17 @@ function PermissionGateComponent(props: PermissionGateProps) {
   const hasPermission = (() => {
     switch (permission) {
       case 'view':
+      case 'canView':
         return permissions.canView;
       case 'create':
+      case 'canCreate':
         return permissions.canCreate;
       case 'edit':
+      case 'canEdit':
+      case 'canUpdate':
         return permissions.canEdit;
       case 'delete':
+      case 'canDelete':
         return permissions.canDelete;
       default:
         return false;

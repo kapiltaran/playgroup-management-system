@@ -14,6 +14,7 @@ import Attendance from "@/pages/attendance";
 import FeeManagement from "@/pages/fee-management";
 import FeePayments from "@/pages/fee-payments";
 import Settings from "@/pages/settings";
+import AcademicYears from "@/pages/academic-years";
 import Login from "@/pages/login";
 import { AuthProvider, useAuth } from "@/context/auth-context";
 import ProtectedRoute from "@/components/protected-route";
@@ -42,7 +43,7 @@ function AuthenticatedApp() {
     parent: ["/students"],
     teacher: ["/dashboard", "/students", "/classes", "/attendance", "/inventory"],
     officeadmin: ["/dashboard", "/students", "/classes", "/attendance", "/fee-management", "/fee-payments", "/expenses", "/inventory", "/reports"],
-    superadmin: ["/dashboard", "/students", "/classes", "/attendance", "/fee-management", "/fee-payments", "/expenses", "/inventory", "/reports", "/settings", "/role-management", "/user-management"]
+    superadmin: ["/dashboard", "/students", "/classes", "/attendance", "/fee-management", "/fee-payments", "/expenses", "/inventory", "/reports", "/settings", "/role-management", "/user-management", "/academic-years"]
   };
 
   // Redirect to allowed page based on role
@@ -132,6 +133,12 @@ function AuthenticatedApp() {
         <Route path="/settings">
           <ProtectedRoute 
             component={Settings} 
+            allowedRoles={["superadmin"]} 
+          />
+        </Route>
+        <Route path="/academic-years">
+          <ProtectedRoute 
+            component={AcademicYears} 
             allowedRoles={["superadmin"]} 
           />
         </Route>

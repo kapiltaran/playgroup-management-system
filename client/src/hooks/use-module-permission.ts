@@ -12,7 +12,8 @@ export type ModuleType =
   | 'reports' 
   | 'settings' 
   | 'user_management'
-  | 'role_management';
+  | 'role_management'
+  | 'academic_years';
 
 interface ModulePermission {
   canView: boolean;
