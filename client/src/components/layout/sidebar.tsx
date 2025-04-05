@@ -14,9 +14,13 @@ import {
   UserCogIcon,
   LogOutIcon,
   CalendarCheckIcon,
-  CalendarIcon
+  CalendarIcon,
+  BookIcon,
+  LayersIcon,
+  UsersRoundIcon
 } from "lucide-react";
 import { useAuth } from "@/context/auth-context";
+import { useState } from "react";
 
 interface SidebarProps {
   setOpen?: (open: boolean) => void;
@@ -25,9 +29,22 @@ interface SidebarProps {
 export default function Sidebar({ setOpen }: SidebarProps) {
   const [location] = useLocation();
   const { user, logout } = useAuth();
+  const [courseMenuOpen, setCourseMenuOpen] = useState(false);
+
+  // Define types for navigation items
+  type NavItem = {
+    href?: string;
+    label: string;
+    icon: React.ReactNode;
+    roles: string[];
+    type?: string;
+    items?: NavItem[];
+    isOpen?: boolean;
+    toggle?: () => void;
+  };
 
   // Base set of navigation items that all users can see
-  const baseNavItems = [
+  const baseNavItems: NavItem[] = [
     {
       href: "/students",
       label: "Students",
@@ -36,13 +53,13 @@ export default function Sidebar({ setOpen }: SidebarProps) {
     }
   ];
 
-  // Admin-only navigation items
-  const adminNavItems = [
+  // Course management submenu items
+  const courseManagementItems: NavItem[] = [
     {
-      href: "/dashboard",
-      label: "Dashboard",
-      icon: <LayoutDashboardIcon className="text-xl mr-3" />,
-      roles: ["teacher", "officeadmin", "superadmin"]
+      href: "/academic-years",
+      label: "Academic Years",
+      icon: <CalendarIcon className="text-xl mr-3" />,
+      roles: ["superadmin"]
     },
     {
       href: "/classes",
@@ -51,16 +68,41 @@ export default function Sidebar({ setOpen }: SidebarProps) {
       roles: ["teacher", "officeadmin", "superadmin"]
     },
     {
-      href: "/attendance",
-      label: "Attendance",
-      icon: <CalendarCheckIcon className="text-xl mr-3" />,
-      roles: ["teacher", "officeadmin", "superadmin"]
+      href: "/batches",
+      label: "Batches",
+      icon: <UsersRoundIcon className="text-xl mr-3" />,
+      roles: ["officeadmin", "superadmin"]
     },
     {
       href: "/fee-management",
       label: "Fee Management",
       icon: <ClipboardCheckIcon className="text-xl mr-3" />,
       roles: ["officeadmin", "superadmin"]
+    }
+  ];
+
+  // Admin-only navigation items
+  const adminNavItems: NavItem[] = [
+    {
+      href: "/dashboard",
+      label: "Dashboard",
+      icon: <LayoutDashboardIcon className="text-xl mr-3" />,
+      roles: ["teacher", "officeadmin", "superadmin"]
+    },
+    {
+      type: "submenu",
+      label: "Course Management",
+      icon: <BookIcon className="text-xl mr-3" />,
+      roles: ["teacher", "officeadmin", "superadmin"],
+      isOpen: courseMenuOpen,
+      toggle: () => setCourseMenuOpen(!courseMenuOpen),
+      items: courseManagementItems.filter(item => user?.role ? item.roles.includes(user.role) : false)
+    },
+    {
+      href: "/attendance",
+      label: "Attendance",
+      icon: <CalendarCheckIcon className="text-xl mr-3" />,
+      roles: ["teacher", "officeadmin", "superadmin"]
     },
     {
       href: "/fee-payments",
@@ -91,13 +133,7 @@ export default function Sidebar({ setOpen }: SidebarProps) {
       label: "Settings",
       icon: <SettingsIcon className="text-xl mr-3" />,
       roles: ["superadmin"]
-    },
-    {
-      href: "/academic-years",
-      label: "Academic Years",
-      icon: <CalendarIcon className="text-xl mr-3" />,
-      roles: ["superadmin"]
-    },
+    }
   ];
 
   // Combine and filter based on user role
@@ -117,31 +153,108 @@ export default function Sidebar({ setOpen }: SidebarProps) {
       <div className="flex-1 overflow-y-auto">
         <nav className="flex-1 px-2 py-4 space-y-1">
           {navItems.map((item, index) => {
-            const isActive = location === item.href || 
-                           (item.href === "/dashboard" && location === "/");
-            
-            return (
-              <Link 
-                key={index} 
-                href={item.href}
-                className={cn(
-                  "flex items-center px-3 py-2 text-sm font-medium rounded-md",
-                  isActive
-                    ? "bg-primary text-white"
-                    : "text-gray-700 hover:bg-gray-100"
-                )}
-                onClick={handleClick}
-              >
-                <span
-                  className={cn(
-                    isActive ? "text-white" : "text-gray-500"
+            if (item.type === "submenu") {
+              // This is a submenu
+              const isSubmenuActive = item.items?.some(subItem => 
+                location === subItem.href
+              );
+              
+              return (
+                <div key={index} className="space-y-1">
+                  <button
+                    className={cn(
+                      "w-full flex items-center justify-between px-3 py-2 text-sm font-medium rounded-md",
+                      isSubmenuActive
+                        ? "bg-primary bg-opacity-10 text-primary"
+                        : "text-gray-700 hover:bg-gray-100"
+                    )}
+                    onClick={() => {
+                      if (item.toggle) item.toggle();
+                    }}
+                  >
+                    <div className="flex items-center">
+                      <span className="text-gray-500">{item.icon}</span>
+                      {item.label}
+                    </div>
+                    <svg
+                      className={cn(
+                        "h-4 w-4 transition-transform",
+                        item.isOpen ? "transform rotate-180" : ""
+                      )}
+                      xmlns="http://www.w3.org/2000/svg"
+                      viewBox="0 0 20 20"
+                      fill="currentColor"
+                      aria-hidden="true"
+                    >
+                      <path
+                        fillRule="evenodd"
+                        d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
+                        clipRule="evenodd"
+                      />
+                    </svg>
+                  </button>
+                  
+                  {/* Submenu items */}
+                  {item.isOpen && item.items && (
+                    <div className="pl-6 space-y-1">
+                      {item.items.map((subItem, subIndex) => {
+                        const isSubItemActive = location === subItem.href;
+                        
+                        return (
+                          <Link
+                            key={`${index}-${subIndex}`}
+                            href={subItem.href || "#"}
+                            className={cn(
+                              "flex items-center px-3 py-2 text-sm font-medium rounded-md",
+                              isSubItemActive
+                                ? "bg-primary text-white"
+                                : "text-gray-700 hover:bg-gray-100"
+                            )}
+                            onClick={handleClick}
+                          >
+                            <span
+                              className={cn(
+                                isSubItemActive ? "text-white" : "text-gray-500"
+                              )}
+                            >
+                              {subItem.icon}
+                            </span>
+                            {subItem.label}
+                          </Link>
+                        );
+                      })}
+                    </div>
                   )}
+                </div>
+              );
+            } else {
+              // This is a regular menu item
+              const isActive = location === item.href || 
+                            (item.href === "/dashboard" && location === "/");
+              
+              return (
+                <Link 
+                  key={index} 
+                  href={item.href || "#"}
+                  className={cn(
+                    "flex items-center px-3 py-2 text-sm font-medium rounded-md",
+                    isActive
+                      ? "bg-primary text-white"
+                      : "text-gray-700 hover:bg-gray-100"
+                  )}
+                  onClick={handleClick}
                 >
-                  {item.icon}
-                </span>
-                {item.label}
-              </Link>
-            );
+                  <span
+                    className={cn(
+                      isActive ? "text-white" : "text-gray-500"
+                    )}
+                  >
+                    {item.icon}
+                  </span>
+                  {item.label}
+                </Link>
+              );
+            }
           })}
         </nav>
       </div>

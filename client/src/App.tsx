@@ -15,6 +15,7 @@ import FeeManagement from "@/pages/fee-management";
 import FeePayments from "@/pages/fee-payments";
 import Settings from "@/pages/settings";
 import AcademicYears from "@/pages/academic-years";
+import Batches from "@/pages/batches";
 import Login from "@/pages/login";
 import { AuthProvider, useAuth } from "@/context/auth-context";
 import ProtectedRoute from "@/components/protected-route";
@@ -42,8 +43,8 @@ function AuthenticatedApp() {
   const rolePathMap = {
     parent: ["/students"],
     teacher: ["/dashboard", "/students", "/classes", "/attendance", "/inventory"],
-    officeadmin: ["/dashboard", "/students", "/classes", "/attendance", "/fee-management", "/fee-payments", "/expenses", "/inventory", "/reports"],
-    superadmin: ["/dashboard", "/students", "/classes", "/attendance", "/fee-management", "/fee-payments", "/expenses", "/inventory", "/reports", "/settings", "/role-management", "/user-management", "/academic-years"]
+    officeadmin: ["/dashboard", "/students", "/classes", "/attendance", "/fee-management", "/fee-payments", "/expenses", "/inventory", "/reports", "/batches"],
+    superadmin: ["/dashboard", "/students", "/classes", "/attendance", "/fee-management", "/fee-payments", "/expenses", "/inventory", "/reports", "/settings", "/role-management", "/user-management", "/academic-years", "/batches"]
   };
 
   // Redirect to allowed page based on role
@@ -140,6 +141,12 @@ function AuthenticatedApp() {
           <ProtectedRoute 
             component={AcademicYears} 
             allowedRoles={["superadmin"]} 
+          />
+        </Route>
+        <Route path="/batches">
+          <ProtectedRoute 
+            component={Batches} 
+            allowedRoles={["officeadmin", "superadmin"]} 
           />
         </Route>
         <Route component={NotFound} />
