@@ -16,6 +16,7 @@ import FeePayments from "@/pages/fee-payments";
 import Settings from "@/pages/settings";
 import AcademicYears from "@/pages/academic-years";
 import Batches from "@/pages/batches";
+import LinkClasses from "@/pages/link-classes";
 import Login from "@/pages/login";
 import { AuthProvider, useAuth } from "@/context/auth-context";
 import ProtectedRoute from "@/components/protected-route";
@@ -42,9 +43,9 @@ function AuthenticatedApp() {
   // Define allowed paths for each role
   const rolePathMap = {
     parent: ["/students"],
-    teacher: ["/dashboard", "/students", "/classes", "/attendance", "/inventory"],
-    officeadmin: ["/dashboard", "/students", "/classes", "/attendance", "/fee-management", "/fee-payments", "/expenses", "/inventory", "/reports", "/batches"],
-    superadmin: ["/dashboard", "/students", "/classes", "/attendance", "/fee-management", "/fee-payments", "/expenses", "/inventory", "/reports", "/settings", "/role-management", "/user-management", "/academic-years", "/batches"]
+    teacher: ["/dashboard", "/students", "/classes", "/attendance", "/inventory", "/link-classes"],
+    officeadmin: ["/dashboard", "/students", "/classes", "/attendance", "/fee-management", "/fee-payments", "/expenses", "/inventory", "/reports", "/batches", "/link-classes"],
+    superadmin: ["/dashboard", "/students", "/classes", "/attendance", "/fee-management", "/fee-payments", "/expenses", "/inventory", "/reports", "/settings", "/role-management", "/user-management", "/academic-years", "/batches", "/link-classes"]
   };
 
   // Redirect to allowed page based on role
@@ -147,6 +148,12 @@ function AuthenticatedApp() {
           <ProtectedRoute 
             component={Batches} 
             allowedRoles={["officeadmin", "superadmin"]} 
+          />
+        </Route>
+        <Route path="/link-classes">
+          <ProtectedRoute 
+            component={LinkClasses} 
+            allowedRoles={["teacher", "officeadmin", "superadmin"]} 
           />
         </Route>
         <Route component={NotFound} />

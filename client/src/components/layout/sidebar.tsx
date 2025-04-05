@@ -30,6 +30,7 @@ export default function Sidebar({ setOpen }: SidebarProps) {
   const [location] = useLocation();
   const { user, logout } = useAuth();
   const [courseMenuOpen, setCourseMenuOpen] = useState(false);
+  const [studentMenuOpen, setStudentMenuOpen] = useState(false);
 
   // Define types for navigation items
   type NavItem = {
@@ -43,13 +44,32 @@ export default function Sidebar({ setOpen }: SidebarProps) {
     toggle?: () => void;
   };
 
-  // Base set of navigation items that all users can see
-  const baseNavItems: NavItem[] = [
+  // Student management submenu items
+  const studentManagementItems: NavItem[] = [
     {
       href: "/students",
       label: "Students",
       icon: <UsersIcon className="text-xl mr-3" />,
       roles: ["parent", "teacher", "officeadmin", "superadmin"]
+    },
+    {
+      href: "/link-classes",
+      label: "Link Classes",
+      icon: <LayersIcon className="text-xl mr-3" />,
+      roles: ["teacher", "officeadmin", "superadmin"]
+    }
+  ];
+
+  // Base set of navigation items that all users can see
+  const baseNavItems: NavItem[] = [
+    {
+      type: "submenu",
+      label: "Student Management",
+      icon: <UsersIcon className="text-xl mr-3" />,
+      roles: ["parent", "teacher", "officeadmin", "superadmin"],
+      isOpen: studentMenuOpen,
+      toggle: () => setStudentMenuOpen(!studentMenuOpen),
+      items: studentManagementItems.filter(item => user?.role ? item.roles.includes(user.role) : false)
     }
   ];
 

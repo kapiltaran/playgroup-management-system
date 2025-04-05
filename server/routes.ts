@@ -2526,6 +2526,103 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: "Failed to fetch students by batch" });
     }
   });
+  
+  // Link students to batch route
+  app.post("/api/students/batch/:batchId", async (req: Request, res: Response) => {
+    try {
+      const user = (req.session as any).user;
+      if (!user) {
+        return res.status(401).json({ message: "Authentication required" });
+      }
+      
+      // Check if user has permission to link students
+      const canUpdate = await storage.checkPermission(user.role, 'students', 'edit');
+      if (!canUpdate) {
+        return res.status(403).json({ message: "You don't have permission to link students" });
+      }
+      
+      const batchId = parseInt(req.params.batchId);
+      
+      if (isNaN(batchId)) {
+        return res.status(400).json({ message: "Invalid batch ID" });
+      }
+      
+      // Validate body
+      if (!req.body.studentIds || !Array.isArray(req.body.studentIds)) {
+        return res.status(400).json({ message: "studentIds array is required" });
+      }
+      
+      const studentIds = req.body.studentIds.map(Number);
+      
+      // Validate each student ID
+      for (const id of studentIds) {
+        if (isNaN(id)) {
+          return res.status(400).json({ message: "Invalid student ID in array" });
+        }
+      }
+      
+      // Link students to batch
+      for (const studentId of studentIds) {
+        await storage.updateStudent(studentId, { batchId });
+      }
+      
+      // Create activity logs
+      await storage.createActivity({
+        type: 'student',
+        action: 'update',
+        details: { batchId, studentCount: studentIds.length, action: 'link to batch' }
+      });
+      
+      res.status(200).json({ message: "Students linked to batch successfully" });
+    } catch (error) {
+      console.error("Error linking students to batch:", error);
+      res.status(500).json({ message: "Failed to link students to batch" });
+    }
+  });
+  
+  // Remove student from batch route
+  app.delete("/api/students/batch/:batchId/:studentId", async (req: Request, res: Response) => {
+    try {
+      const user = (req.session as any).user;
+      if (!user) {
+        return res.status(401).json({ message: "Authentication required" });
+      }
+      
+      // Check if user has permission to unlink students
+      const canUpdate = await storage.checkPermission(user.role, 'students', 'edit');
+      if (!canUpdate) {
+        return res.status(403).json({ message: "You don't have permission to unlink students" });
+      }
+      
+      const batchId = parseInt(req.params.batchId);
+      const studentId = parseInt(req.params.studentId);
+      
+      if (isNaN(batchId) || isNaN(studentId)) {
+        return res.status(400).json({ message: "Invalid batch ID or student ID" });
+      }
+      
+      // First check if student is in the specified batch
+      const student = await storage.getStudent(studentId);
+      if (!student || student.batchId !== batchId) {
+        return res.status(400).json({ message: "Student is not in the specified batch" });
+      }
+      
+      // Remove student from batch by setting batchId to null
+      await storage.updateStudent(studentId, { batchId: null });
+      
+      // Create activity log
+      await storage.createActivity({
+        type: 'student',
+        action: 'update',
+        details: { studentId, action: 'removed from batch', batchId }
+      });
+      
+      res.status(200).json({ message: "Student removed from batch successfully" });
+    } catch (error) {
+      console.error("Error removing student from batch:", error);
+      res.status(500).json({ message: "Failed to remove student from batch" });
+    }
+  });
 
   const httpServer = createServer(app);
   return httpServer;
