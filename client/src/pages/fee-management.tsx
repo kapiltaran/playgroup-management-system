@@ -454,7 +454,7 @@ export default function FeeManagement() {
   };
 
   // Handle installment form submission
-  const handleInstallmentSubmit = (e: React.FormEvent) => {
+  const handleInstallmentSubmit = (e: React.FormEventEvent) => {
     e.preventDefault();
     
     // Validate the form data
@@ -536,137 +536,176 @@ export default function FeeManagement() {
         </TabsList>
 
         <TabsContent value="structures" className="mt-4">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center space-x-4">
-              <h2 className="text-xl font-semibold">Fee Structures</h2>
-              <Select 
-                value={selectedAcademicYearId?.toString() || "all"} 
-                onValueChange={(value) => {
-                  setSelectedAcademicYearId(value !== "all" ? parseInt(value) : null);
-                  // Reset class filter when academic year changes
-                  setSelectedFilterClassId(null);
-                }}
-              >
-                <SelectTrigger className="w-[250px]">
-                  <SelectValue placeholder="Filter by Academic Year" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Academic Years</SelectItem>
-                  {academicYears?.map((year) => (
-                    <SelectItem key={year.id} value={year.id.toString()}>
-                      {year.name} {year.isCurrent && "(Current)"}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+          <div className="space-y-6">
+            <div>
+              <h2 className="text-xl font-semibold mb-4">Fee Structures</h2>
               
-              <Select 
-                value={selectedFilterClassId?.toString() || "all"} 
-                onValueChange={(value) => setSelectedFilterClassId(value !== "all" ? parseInt(value) : null)}
-                disabled={!selectedAcademicYearId}
-              >
-                <SelectTrigger className="w-[200px]">
-                  <SelectValue placeholder="Filter by Class" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Classes</SelectItem>
-                  {classes?.map((classItem) => (
-                    <SelectItem key={classItem.id} value={classItem.id.toString()}>
-                      {classItem.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <Button onClick={() => {
-              setStructureFormMode("add");
-              resetStructureForm();
-              setIsStructureFormOpen(true);
-            }}>
-              <PlusCircleIcon className="mr-2 h-4 w-4" /> Add Fee Structure
-            </Button>
-          </div>
-
-          <div className="bg-white shadow rounded-lg">
-            <DataTable
-              data={filteredFeeStructures || []}
-              isLoading={isLoadingStructures}
-              searchKey="name"
-              columns={[
-                {
-                  accessorKey: "name",
-                  header: "Structure Name",
-                  cell: (item) => (
-                    <div className="text-sm font-medium text-gray-900">{item.name}</div>
-                  )
-                },
-                {
-                  accessorKey: "classId",
-                  header: "Class",
-                  cell: (item) => (
-                    <Badge className="bg-primary-100 text-primary-800 hover:bg-primary-100">
-                      {getClassName(item.classId)}
-                    </Badge>
-                  )
-                },
-                {
-                  accessorKey: "totalAmount",
-                  header: "Total Amount",
-                  cell: (item) => (
-                    <div className="text-sm text-gray-900">${parseFloat(item.totalAmount).toFixed(2)}</div>
-                  )
-                },
-                {
-                  accessorKey: "academicYearId",
-                  header: "Academic Year",
-                  cell: (item) => (
-                    <div className="text-sm text-gray-700">{getAcademicYearName(item.academicYearId)}</div>
-                  )
-                },
-                {
-                  accessorKey: "id",
-                  header: "Actions",
-                  cell: (item) => (
-                    <div className="flex space-x-2">
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        onClick={() => {
-                          setSelectedStructureId(item.id);
-                          setActiveTab("installments");
+              <Card className="mb-6">
+                <CardHeader>
+                  <CardTitle className="text-lg">Select Academic Year and Class</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="academicYearFilter">Academic Year</Label>
+                      <Select 
+                        value={selectedAcademicYearId?.toString() || ""} 
+                        onValueChange={(value) => {
+                          setSelectedAcademicYearId(parseInt(value));
+                          // Reset class filter when academic year changes
+                          setSelectedFilterClassId(null);
                         }}
                       >
-                        <LayersIcon className="h-4 w-4" />
-                      </Button>
-                      <Button 
-                        variant="outline" 
-                        size="sm"
-                        title="Clone Fee Structure"
-                        onClick={() => handleCloneFeeStructure(item)}
-                      >
-                        <CopyIcon className="h-4 w-4" />
-                      </Button>
-                      <Button 
-                        variant="outline" 
-                        size="sm"
-                        title="Edit Fee Structure"
-                        onClick={() => handleEditStructure(item)}
-                      >
-                        <PencilIcon className="h-4 w-4" />
-                      </Button>
-                      <Button 
-                        variant="destructive" 
-                        size="sm"
-                        title="Delete Fee Structure"
-                        onClick={() => handleDeleteStructure(item.id)}
-                      >
-                        <TrashIcon className="h-4 w-4" />
-                      </Button>
+                        <SelectTrigger id="academicYearFilter" className="w-full">
+                          <SelectValue placeholder="Select Academic Year" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {academicYears?.map((year) => (
+                            <SelectItem key={year.id} value={year.id.toString()}>
+                              {year.name} {year.isCurrent && "(Current)"}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
-                  )
-                }
-              ]}
-            />
+                    
+                    <div className="space-y-2">
+                      <Label htmlFor="classFilter">Class</Label>
+                      <Select 
+                        value={selectedFilterClassId?.toString() || ""} 
+                        onValueChange={(value) => setSelectedFilterClassId(parseInt(value))}
+                        disabled={!selectedAcademicYearId}
+                      >
+                        <SelectTrigger id="classFilter" className="w-full">
+                          <SelectValue placeholder="Select Class" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {classes?.map((classItem) => (
+                            <SelectItem key={classItem.id} value={classItem.id.toString()}>
+                              {classItem.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  
+                  <div className="mt-4 flex justify-end">
+                    <Button 
+                      onClick={() => {
+                        if (!selectedAcademicYearId || !selectedFilterClassId) {
+                          toast({
+                            title: "Selection Required",
+                            description: "Please select both Academic Year and Class before creating a fee structure",
+                            variant: "destructive"
+                          });
+                          return;
+                        }
+                        setStructureFormMode("add");
+                        // Pre-fill the form with the selected academic year and class
+                        setStructureFormData(prev => ({
+                          ...prev,
+                          academicYearId: selectedAcademicYearId,
+                          classId: selectedFilterClassId,
+                          name: "",
+                          totalAmount: "",
+                          description: ""
+                        }));
+                        setIsStructureFormOpen(true);
+                      }}
+                    >
+                      <PlusCircleIcon className="mr-2 h-4 w-4" /> Create New Fee Structure
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+              
+              {(!selectedAcademicYearId || !selectedFilterClassId) ? (
+                <Card>
+                  <CardContent className="pt-6">
+                    <div className="text-center text-muted-foreground">
+                      <LayersIcon className="mx-auto h-12 w-12 text-muted-foreground/50 mb-4" />
+                      <h3 className="text-lg font-medium mb-2">Please Select Academic Year and Class</h3>
+                      <p>Fee structures will be displayed once you select both an academic year and a class.</p>
+                    </div>
+                  </CardContent>
+                </Card>
+              ) : (
+                <div>
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-lg font-medium">
+                      Fee Structures for {getAcademicYearName(selectedAcademicYearId)} - {getClassName(selectedFilterClassId)}
+                    </h3>
+                  </div>
+                  <div className="bg-white shadow rounded-lg">
+                    <DataTable
+                      data={filteredFeeStructures || []}
+                      isLoading={isLoadingStructures}
+                      searchKey="name"
+                      columns={[
+                        {
+                          accessorKey: "name",
+                          header: "Structure Name",
+                          cell: (item) => (
+                            <div className="text-sm font-medium text-gray-900">{item.name}</div>
+                          )
+                        },
+                        {
+                          accessorKey: "totalAmount",
+                          header: "Total Amount",
+                          cell: (item) => (
+                            <div className="text-sm text-gray-900">${parseFloat(item.totalAmount).toFixed(2)}</div>
+                          )
+                        },
+                        {
+                          accessorKey: "id",
+                          header: "Actions",
+                          cell: (item) => (
+                            <div className="flex space-x-2">
+                              <Button 
+                                variant="outline" 
+                                size="sm" 
+                                onClick={() => {
+                                  setSelectedStructureId(item.id);
+                                  setActiveTab("installments");
+                                }}
+                                title="View Installments"
+                              >
+                                <LayersIcon className="h-4 w-4" />
+                              </Button>
+                              <Button 
+                                variant="outline" 
+                                size="sm"
+                                title="Clone Fee Structure"
+                                onClick={() => handleCloneFeeStructure(item)}
+                              >
+                                <CopyIcon className="h-4 w-4" />
+                              </Button>
+                              <Button 
+                                variant="outline" 
+                                size="sm"
+                                title="Edit Fee Structure"
+                                onClick={() => handleEditStructure(item)}
+                              >
+                                <PencilIcon className="h-4 w-4" />
+                              </Button>
+                              <Button 
+                                variant="destructive" 
+                                size="sm"
+                                title="Delete Fee Structure"
+                                onClick={() => handleDeleteStructure(item.id)}
+                              >
+                                <TrashIcon className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          )
+                        }
+                      ]}
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </TabsContent>
 
@@ -940,43 +979,41 @@ export default function FeeManagement() {
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>
-              {installmentFormMode === "add" ? "Add Fee Installment" : "Edit Fee Installment"}
+              {installmentFormMode === "add" ? "Add Installment" : "Edit Installment"}
             </DialogTitle>
             <DialogDescription>
               {installmentFormMode === "add" 
-                ? "Create a new installment for this fee structure." 
+                ? "Create a new installment for the selected fee structure." 
                 : "Update the details of this installment."}
             </DialogDescription>
           </DialogHeader>
 
           <form onSubmit={handleInstallmentSubmit} className="space-y-4">
             <div className="grid grid-cols-1 gap-4">
-              {!selectedStructureId && installmentFormMode === "add" && (
-                <div className="space-y-2">
-                  <Label htmlFor="feeStructureId">Fee Structure</Label>
-                  <Select 
-                    value={installmentFormData.feeStructureId.toString()} 
-                    onValueChange={(value) => {
-                      setInstallmentFormData(prev => ({
-                        ...prev,
-                        feeStructureId: parseInt(value)
-                      }));
-                    }}
-                  >
-                    <SelectTrigger id="feeStructureId">
-                      <SelectValue placeholder="Select a fee structure" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {(selectedAcademicYearId ? filteredFeeStructures : feeStructures)?.map((structure) => (
-                        <SelectItem key={structure.id} value={structure.id.toString()}>
-                          {structure.name} - {getAcademicYearName(structure.academicYearId)}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
-
+              <div className="space-y-2">
+                <Label htmlFor="feeStructureId">Fee Structure</Label>
+                <Select 
+                  value={installmentFormData.feeStructureId.toString()} 
+                  onValueChange={(value) => {
+                    setInstallmentFormData(prev => ({
+                      ...prev,
+                      feeStructureId: parseInt(value)
+                    }));
+                  }}
+                >
+                  <SelectTrigger id="feeStructureId">
+                    <SelectValue placeholder="Select fee structure" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {feeStructures?.map((structure) => (
+                      <SelectItem key={structure.id} value={structure.id.toString()}>
+                        {structure.name} - {getClassName(structure.classId)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            
               <div className="space-y-2">
                 <Label htmlFor="name">Installment Name</Label>
                 <Input
