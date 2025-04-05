@@ -1,6 +1,5 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { format } from "date-fns";
 import { PencilIcon, TrashIcon, PlusCircleIcon } from "lucide-react";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
@@ -11,19 +10,18 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import type { AcademicYear } from "@shared/schema";
 
 // Extended Class type with additional UI fields
 interface Class {
   id: number;
   name: string;
   description: string | null;
-  academicYearId: number;
   createdAt: Date | null;
-  // UI-specific fields that aren't in the database schema
+  // Fields from schema
   ageGroup?: string;
-  capacity?: number;
+  startTime?: string | null;
+  endTime?: string | null;
+  days?: string[] | null;
 }
 
 export default function Classes() {
@@ -34,56 +32,13 @@ export default function Classes() {
   const [formData, setFormData] = useState({
     name: "",
     ageGroup: "",
-    capacity: 0,
     description: "",
-    academicYearId: 0
+    startTime: "",
+    endTime: "",
+    days: [] as string[]
   });
 
-  // Fetch academic years
-  const { data: academicYears, isLoading: isLoadingYears } = useQuery<AcademicYear[]>({
-    queryKey: ["/api/academic-years"],
-    queryFn: async () => {
-      const response = await fetch('/api/academic-years', {
-        method: 'GET',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include'
-      });
-      
-      if (!response.ok) {
-        throw new Error(`Error ${response.status}: ${response.statusText}`);
-      }
-      
-      return response.json();
-    }
-  });
-
-  // Fetch current academic year
-  const { data: currentYear } = useQuery<AcademicYear>({
-    queryKey: ["/api/academic-years/current"],
-    queryFn: async () => {
-      const response = await fetch('/api/academic-years/current', {
-        method: 'GET',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include'
-      });
-      
-      if (!response.ok) {
-        throw new Error(`Error ${response.status}: ${response.statusText}`);
-      }
-      
-      return response.json();
-    }
-  });
-
-  // Set default academic year when available
-  useEffect(() => {
-    if (currentYear && formData.academicYearId === 0) {
-      setFormData(prev => ({
-        ...prev,
-        academicYearId: currentYear.id
-      }));
-    }
-  }, [currentYear]);
+  // No need for academic year queries as they have been removed
 
   // Fetch classes
   const { data: classes, isLoading } = useQuery<Class[]>({
@@ -173,9 +128,10 @@ export default function Classes() {
     setFormData({
       name: "",
       ageGroup: "",
-      capacity: 0,
       description: "",
-      academicYearId: 0
+      startTime: "",
+      endTime: "",
+      days: []
     });
     setCurrentClass(null);
   };
@@ -187,9 +143,10 @@ export default function Classes() {
     setFormData({
       name: classItem.name,
       ageGroup: classItem.ageGroup || "",
-      capacity: classItem.capacity || 0,
       description: classItem.description || "",
-      academicYearId: classItem.academicYearId
+      startTime: classItem.startTime || "",
+      endTime: classItem.endTime || "",
+      days: classItem.days || []
     });
     setIsFormOpen(true);
   };
@@ -219,15 +176,15 @@ export default function Classes() {
     const { name, value } = e.target;
     setFormData(prev => ({
       ...prev,
-      [name]: name === "capacity" ? parseInt(value) || 0 : value
+      [name]: value
     }));
   };
 
-  // Handle select change for academic year
-  const handleAcademicYearChange = (value: string) => {
+  // Handle day selection change
+  const handleDaysChange = (selectedDays: string[]) => {
     setFormData(prev => ({
       ...prev,
-      academicYearId: parseInt(value)
+      days: selectedDays
     }));
   };
 
@@ -267,10 +224,12 @@ export default function Classes() {
               )
             },
             {
-              accessorKey: "capacity",
-              header: "Capacity",
+              accessorKey: "startTime",
+              header: "Schedule",
               cell: (item) => (
-                <div className="text-sm text-gray-900">{item.capacity} students</div>
+                <div className="text-sm text-gray-900">
+                  {item.startTime && item.endTime ? `${item.startTime} - ${item.endTime}` : "Not scheduled"}
+                </div>
               )
             },
             {
@@ -342,37 +301,50 @@ export default function Classes() {
                 />
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="capacity">Capacity</Label>
-                <Input
-                  id="capacity"
-                  name="capacity"
-                  type="number"
-                  value={formData.capacity}
-                  onChange={handleInputChange}
-                  min={1}
-                  required
-                />
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="startTime">Start Time</Label>
+                  <Input
+                    id="startTime"
+                    name="startTime"
+                    type="time"
+                    value={formData.startTime}
+                    onChange={handleInputChange}
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="endTime">End Time</Label>
+                  <Input
+                    id="endTime"
+                    name="endTime"
+                    type="time"
+                    value={formData.endTime}
+                    onChange={handleInputChange}
+                  />
+                </div>
               </div>
-
+              
               <div className="space-y-2">
-                <Label htmlFor="academicYearId">Academic Year</Label>
-                <Select
-                  value={formData.academicYearId.toString()}
-                  onValueChange={handleAcademicYearChange}
-                  required
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Select Academic Year" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {academicYears?.map((year) => (
-                      <SelectItem key={year.id} value={year.id.toString()}>
-                        {year.name} {year.isCurrent && "(Current)"}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Label>Days of the Week</Label>
+                <div className="flex flex-wrap gap-2">
+                  {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map(day => (
+                    <Button
+                      key={day}
+                      type="button"
+                      variant={formData.days.includes(day) ? "default" : "outline"}
+                      onClick={() => {
+                        const updatedDays = formData.days.includes(day)
+                          ? formData.days.filter(d => d !== day)
+                          : [...formData.days, day];
+                        handleDaysChange(updatedDays);
+                      }}
+                      className="px-3 py-1"
+                    >
+                      {day.substring(0, 3)}
+                    </Button>
+                  ))}
+                </div>
               </div>
 
               <div className="space-y-2">

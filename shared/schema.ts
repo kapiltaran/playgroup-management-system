@@ -44,8 +44,9 @@ export const classes = pgTable("classes", {
   name: text("name").notNull(),
   description: text("description"),
   ageGroup: text("age_group"),
-  capacity: integer("capacity"),
-  academicYearId: integer("academic_year_id").notNull().references(() => academicYears.id),
+  startTime: text("start_time"),
+  endTime: text("end_time"),
+  days: text("days").array(),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
