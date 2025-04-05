@@ -261,10 +261,21 @@ export default function FeeManagement() {
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
   ) => {
     const { name, value } = e.target;
-    setStructureFormData(prev => ({
-      ...prev,
-      [name]: name === "classId" ? parseInt(value) || 0 : value
-    }));
+    
+    // Update the form data with the new value
+    setStructureFormData(prev => {
+      const newData = {
+        ...prev,
+        [name]: name === "classId" ? parseInt(value) || 0 : value
+      };
+      
+      // If the name field is being updated and description is empty, copy name to description
+      if (name === "name" && prev.description === "") {
+        newData.description = value;
+      }
+      
+      return newData;
+    });
   };
 
   // Get class name by id
