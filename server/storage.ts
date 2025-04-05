@@ -260,7 +260,9 @@ export class MemStorage implements IStorage {
       ...classData, 
       id, 
       createdAt: now,
-      description: classData.description || null 
+      description: classData.description || null,
+      ageGroup: classData.ageGroup || null,
+      capacity: classData.capacity || null
     };
     this.classes.set(id, newClass);
     
@@ -278,7 +280,13 @@ export class MemStorage implements IStorage {
     const classItem = this.classes.get(id);
     if (!classItem) return undefined;
     
-    const updatedClass = { ...classItem, ...classData };
+    // Ensure ageGroup and capacity are properly handled
+    const updatedClass = { 
+      ...classItem, 
+      ...classData,
+      ageGroup: classData.ageGroup !== undefined ? classData.ageGroup : classItem.ageGroup,
+      capacity: classData.capacity !== undefined ? classData.capacity : classItem.capacity
+    };
     this.classes.set(id, updatedClass);
     
     // Log activity

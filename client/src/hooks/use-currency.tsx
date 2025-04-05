@@ -17,7 +17,7 @@ export function useCurrency() {
   const { data: currencySetting, isLoading } = useQuery<CurrencySettings>({
     queryKey: ["/api/settings/currency"],
     queryFn: () => apiRequest<CurrencySettings>("GET", "/api/settings/currency", undefined),
-    staleTime: 1000 * 60 * 15, // Cache for 15 minutes
+    // Removed long stale time to ensure currency updates are reflected immediately
   });
 
   useEffect(() => {
