@@ -125,7 +125,7 @@ export default function Sidebar({ setOpen }: SidebarProps) {
     },
     {
       href: "/fee-payments",
-      label: "Payments",
+      label: "Fee Collection",
       icon: <ReceiptIcon className="text-xl mr-3" />,
       roles: ["officeadmin", "superadmin"]
     },

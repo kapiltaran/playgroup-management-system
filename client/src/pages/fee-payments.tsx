@@ -458,7 +458,7 @@ export default function FeePayments() {
   return (
     <div className="max-w-7xl mx-auto">
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Fee Payments</h1>
+        <h1 className="text-2xl font-bold text-gray-900">Fee Collection</h1>
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-6">
