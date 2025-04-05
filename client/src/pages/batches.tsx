@@ -159,7 +159,7 @@ export default function Batches() {
   // Set up mutations
   const createBatchMutation = useMutation({
     mutationFn: (data: z.infer<typeof batchFormSchema>) => {
-      return apiRequest("/api/batches", "POST", {
+      return apiRequest("POST", "/api/batches", {
         name: data.name,
         academicYearId: parseInt(data.academicYearId),
         classId: parseInt(data.classId),
@@ -186,7 +186,7 @@ export default function Batches() {
 
   const updateBatchMutation = useMutation({
     mutationFn: (data: { id: number; batch: any }) => {
-      return apiRequest(`/api/batches/${data.id}`, "PATCH", data.batch);
+      return apiRequest("PATCH", `/api/batches/${data.id}`, data.batch);
     },
     onSuccess: () => {
       toast({
@@ -208,7 +208,7 @@ export default function Batches() {
 
   const deleteBatchMutation = useMutation({
     mutationFn: (id: number) => {
-      return apiRequest(`/api/batches/${id}`, "DELETE");
+      return apiRequest("DELETE", `/api/batches/${id}`);
     },
     onSuccess: () => {
       toast({
