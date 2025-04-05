@@ -28,7 +28,17 @@ export default function FeeManagement() {
   const today = new Date();
   const formattedDate = today.toISOString().split('T')[0];
   
-  const [structureFormData, setStructureFormData] = useState({
+  // Define the type for fee structure form data
+  interface FeeStructureFormData {
+    name: string;
+    classId: number;
+    academicYearId: number;
+    totalAmount: string | number; // Allow both string and number for flexibility
+    description: string;
+    dueDate: string;
+  }
+  
+  const [structureFormData, setStructureFormData] = useState<FeeStructureFormData>({
     name: "",
     classId: 0,
     academicYearId: 0,
@@ -199,11 +209,15 @@ export default function FeeManagement() {
   const handleCloneFeeStructure = (structure: FeeStructure) => {
     setStructureFormMode("clone");
     setCurrentStructure(structure);
+    
+    // Convert totalAmount to string regardless of its original type
+    const totalAmount = String(structure.totalAmount);
+    
     setStructureFormData({
       name: `Copy of ${structure.name}`,
       classId: selectedFilterClassId || 0,
       academicYearId: selectedAcademicYearId || 0,
-      totalAmount: structure.totalAmount,
+      totalAmount: totalAmount,
       description: structure.description || "",
       dueDate: structure.dueDate || formattedDate
     });
@@ -240,10 +254,16 @@ export default function FeeManagement() {
       return;
     }
     
+    // Ensure totalAmount is properly processed
+    // Make sure we get a string value for the totalAmount
+    const totalAmountStr = String(structureFormData.totalAmount);
+    
     const formDataToSubmit = {
       ...structureFormData,
-      totalAmount: structureFormData.totalAmount.toString()
+      totalAmount: totalAmountStr
     };
+    
+    console.log("Form data to submit:", formDataToSubmit);
     
     if (structureFormMode === "add" || structureFormMode === "clone") {
       // Both add and clone create a new fee structure
@@ -266,14 +286,26 @@ export default function FeeManagement() {
     
     // Update the form data with the new value
     setStructureFormData(prev => {
-      const newData = {
-        ...prev,
-        [name]: name === "classId" ? parseInt(value) || 0 : value
-      };
+      // Create a copy of the previous state
+      const newData = { ...prev } as FeeStructureFormData;
       
-      // If the name field is being updated and description is empty, copy name to description
-      if (name === "name" && prev.description === "") {
+      // Handle different fields appropriately
+      if (name === "classId") {
+        newData.classId = parseInt(value) || 0;
+      } else if (name === "academicYearId") {
+        newData.academicYearId = parseInt(value) || 0;
+      } else if (name === "totalAmount") {
+        newData.totalAmount = value;
+      } else if (name === "name") {
+        newData.name = value;
+        // If the name field is being updated and description is empty, copy name to description
+        if (prev.description === "") {
+          newData.description = value;
+        }
+      } else if (name === "description") {
         newData.description = value;
+      } else if (name === "dueDate") {
+        newData.dueDate = value;
       }
       
       return newData;

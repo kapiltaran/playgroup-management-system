@@ -18,7 +18,7 @@ import {
   insertBatchSchema,
   roleEnum
 } from "@shared/schema";
-import { ZodError } from "zod";
+import { ZodError, z } from "zod";
 import { createUserFromStudent } from "./services/auth";
 import { sendWelcomeEmail } from "./services/email";
 
@@ -257,7 +257,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
-      const updates = insertStudentSchema.partial().parse(req.body);
+      const updates = z.object({
+        fullName: z.string().optional(),
+        dateOfBirth: z.string().optional(),
+        age: z.number().optional().nullable(),
+        gender: z.string().optional(),
+        guardianName: z.string().optional(),
+        phone: z.string().optional(),
+        email: z.string().optional(),
+        address: z.string().optional().nullable(),
+        city: z.string().optional().nullable(),
+        postalCode: z.string().optional().nullable(),
+        state: z.string().optional().nullable(),
+        country: z.string().optional().nullable(),
+        status: z.string().optional(),
+        classId: z.number().optional().nullable(),
+        batchId: z.number().optional().nullable(),
+        feeStructureId: z.number().optional().nullable(),
+        notes: z.string().optional().nullable()
+      }).parse(req.body);
       const updatedStudent = await storage.updateStudent(id, updates);
       
       if (!updatedStudent) {
@@ -342,7 +360,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch("/api/expenses/:id", async (req: Request, res: Response) => {
     try {
       const id = parseInt(req.params.id);
-      const updates = insertExpenseSchema.partial().parse(req.body);
+      const updates = z.object({
+        description: z.string().optional(),
+        amount: z.string().optional(),
+        category: z.string().optional(),
+        date: z.string().optional(),
+        notes: z.string().optional().nullable()
+      }).parse(req.body);
       
       const updatedExpense = await storage.updateExpense(id, updates);
       
@@ -412,7 +436,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch("/api/inventory/:id", async (req: Request, res: Response) => {
     try {
       const id = parseInt(req.params.id);
-      const updates = insertInventorySchema.partial().parse(req.body);
+      const updates = z.object({
+        name: z.string().optional(),
+        category: z.string().optional(),
+        quantity: z.number().optional(),
+        minQuantity: z.number().optional(),
+        unitPrice: z.string().optional(),
+        supplier: z.string().optional().nullable(),
+        notes: z.string().optional().nullable()
+      }).parse(req.body);
       
       const updatedItem = await storage.updateInventoryItem(id, updates);
       
@@ -599,7 +631,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Invalid class ID" });
       }
       
-      const updateData = insertClassSchema.partial().parse(req.body);
+      const updateData = z.object({
+        name: z.string().optional(),
+        academicYearId: z.number().optional(),
+        ageGroup: z.string().optional().nullable(),
+        description: z.string().optional().nullable(),
+        capacity: z.number().optional().nullable(),
+        startTime: z.string().optional().nullable(),
+        endTime: z.string().optional().nullable(),
+        days: z.array(z.string()).optional().nullable()
+      }).parse(req.body);
       const updatedClass = await storage.updateClass(classId, updateData);
       
       if (!updatedClass) {
@@ -689,7 +730,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Invalid fee structure ID" });
       }
       
-      const updateData = insertFeeStructureSchema.partial().parse(req.body);
+      // Use the full schema to validate but make all fields optional
+      const updateData = z.object({
+        name: z.string().optional(),
+        classId: z.number().optional(),
+        totalAmount: z.string().optional(),
+        academicYearId: z.number().optional(),
+        description: z.string().nullable().optional(),
+        dueDate: z.string().nullable().optional()
+      }).parse(req.body);
+      
       const updatedFeeStructure = await storage.updateFeeStructure(feeStructureId, updateData);
       
       if (!updatedFeeStructure) {
@@ -772,7 +822,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Invalid installment ID" });
       }
       
-      const updateData = insertFeeInstallmentSchema.partial().parse(req.body);
+      const updateData = z.object({
+        feeStructureId: z.number().optional(),
+        name: z.string().optional(),
+        amount: z.string().optional(),
+        dueDate: z.string().optional()
+      }).parse(req.body);
       const updatedInstallment = await storage.updateFeeInstallment(installmentId, updateData);
       
       if (!updatedInstallment) {
@@ -912,7 +967,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Invalid payment ID" });
       }
       
-      const updateData = insertFeePaymentSchema.partial().parse(req.body);
+      const updateData = z.object({
+        studentId: z.number().optional(),
+        installmentId: z.number().optional(),
+        paymentDate: z.string().optional(),
+        amount: z.string().optional(),
+        paymentMethod: z.string().optional(),
+        receiptNumber: z.string().nullable().optional(),
+        notes: z.string().nullable().optional()
+      }).parse(req.body);
       const updatedPayment = await storage.updateFeePayment(paymentId, updateData);
       
       if (!updatedPayment) {
@@ -1049,7 +1112,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Invalid reminder ID" });
       }
       
-      const updateData = insertReminderSchema.partial().parse(req.body);
+      const updateData = z.object({
+        studentId: z.number().optional(),
+        installmentId: z.number().optional(),
+        status: z.string().optional(),
+        sentDate: z.date().optional().nullable(),
+        message: z.string().optional()
+      }).parse(req.body);
       const updatedReminder = await storage.updateReminder(reminderId, updateData);
       
       if (!updatedReminder) {
@@ -2208,7 +2277,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Parse and validate the updates
-      const updates = insertAttendanceSchema.partial().parse(req.body);
+      const updates = z.object({
+        classId: z.number().optional(),
+        studentId: z.number().optional(),
+        date: z.string().optional(),
+        status: z.string().optional(),
+        notes: z.string().optional().nullable()
+      }).parse(req.body);
       
       // Apply the update
       const updatedAttendance = await storage.updateAttendance(id, updates);
@@ -2370,7 +2445,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Invalid batch ID" });
       }
       
-      const result = insertBatchSchema.partial().safeParse(req.body);
+      const result = z.object({
+        name: z.string().optional(),
+        classId: z.number().optional(),
+        academicYearId: z.number().optional(),
+        description: z.string().optional().nullable()
+      }).safeParse(req.body);
       
       if (!result.success) {
         return handleZodError(result.error, res);

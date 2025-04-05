@@ -83,10 +83,20 @@ export const feeStructures = pgTable("fee_structures", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
-export const insertFeeStructureSchema = createInsertSchema(feeStructures).omit({
-  id: true,
-  createdAt: true,
-});
+export const insertFeeStructureSchema = createInsertSchema(feeStructures)
+  .omit({
+    id: true,
+    createdAt: true,
+  })
+  .transform((data) => {
+    // Ensure totalAmount is always a string in expected format
+    return {
+      ...data,
+      totalAmount: typeof data.totalAmount === 'string' 
+        ? data.totalAmount 
+        : String(data.totalAmount)
+    };
+  });
 
 // Fee installment schema
 export const feeInstallments = pgTable("fee_installments", {
@@ -98,10 +108,20 @@ export const feeInstallments = pgTable("fee_installments", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
-export const insertFeeInstallmentSchema = createInsertSchema(feeInstallments).omit({
-  id: true,
-  createdAt: true,
-});
+export const insertFeeInstallmentSchema = createInsertSchema(feeInstallments)
+  .omit({
+    id: true,
+    createdAt: true,
+  })
+  .transform((data) => {
+    // Ensure amount is always a string in expected format
+    return {
+      ...data,
+      amount: typeof data.amount === 'string' 
+        ? data.amount 
+        : String(data.amount)
+    };
+  });
 
 // Student schema
 export const students = pgTable("students", {
@@ -177,10 +197,20 @@ export const feePayments = pgTable("fee_payments", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
-export const insertFeePaymentSchema = createInsertSchema(feePayments).omit({
-  id: true,
-  createdAt: true,
-});
+export const insertFeePaymentSchema = createInsertSchema(feePayments)
+  .omit({
+    id: true,
+    createdAt: true,
+  })
+  .transform((data) => {
+    // Ensure amount is always a string in expected format
+    return {
+      ...data,
+      amount: typeof data.amount === 'string' 
+        ? data.amount 
+        : String(data.amount)
+    };
+  });
 
 // Reminder notifications schema
 export const reminders = pgTable("reminders", {
