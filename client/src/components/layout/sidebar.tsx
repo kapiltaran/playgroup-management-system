@@ -61,17 +61,7 @@ export default function Sidebar({ setOpen }: SidebarProps) {
   ];
 
   // Base set of navigation items that all users can see
-  const baseNavItems: NavItem[] = [
-    {
-      type: "submenu",
-      label: "Student Management",
-      icon: <UsersIcon className="text-xl mr-3" />,
-      roles: ["parent", "teacher", "officeadmin", "superadmin"],
-      isOpen: studentMenuOpen,
-      toggle: () => setStudentMenuOpen(!studentMenuOpen),
-      items: studentManagementItems.filter(item => user?.role ? item.roles.includes(user.role) : false)
-    }
-  ];
+  const baseNavItems: NavItem[] = [];
 
   // Course management submenu items
   const courseManagementItems: NavItem[] = [
@@ -117,6 +107,15 @@ export default function Sidebar({ setOpen }: SidebarProps) {
       isOpen: courseMenuOpen,
       toggle: () => setCourseMenuOpen(!courseMenuOpen),
       items: courseManagementItems.filter(item => user?.role ? item.roles.includes(user.role) : false)
+    },
+    {
+      type: "submenu",
+      label: "Student Management",
+      icon: <UsersIcon className="text-xl mr-3" />,
+      roles: ["parent", "teacher", "officeadmin", "superadmin"],
+      isOpen: studentMenuOpen,
+      toggle: () => setStudentMenuOpen(!studentMenuOpen),
+      items: studentManagementItems.filter(item => user?.role ? item.roles.includes(user.role) : false)
     },
     {
       href: "/attendance",
