@@ -42,6 +42,7 @@ export const feeStructures = pgTable("fee_structures", {
   totalAmount: numeric("total_amount", { precision: 10, scale: 2 }).notNull(),
   academicYearId: integer("academic_year_id").notNull().references(() => academicYears.id),
   description: text("description"),
+  dueDate: date("due_date"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 

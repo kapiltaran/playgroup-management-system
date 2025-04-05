@@ -343,7 +343,8 @@ export class MemStorage implements IStorage {
       ...feeStructure, 
       id, 
       createdAt: now,
-      description: feeStructure.description || null
+      description: feeStructure.description || null,
+      dueDate: feeStructure.dueDate || null
     };
     this.feeStructures.set(id, newFeeStructure);
     

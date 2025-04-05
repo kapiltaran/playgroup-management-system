@@ -1,50 +1,37 @@
 import { useState, useEffect, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { format } from "date-fns";
-import { PencilIcon, TrashIcon, PlusCircleIcon, LayersIcon, CalendarIcon, CopyIcon } from "lucide-react";
+import { PencilIcon, TrashIcon, PlusCircleIcon, LayersIcon, CopyIcon } from "lucide-react";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/ui/data-table";
-import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import type { FeeStructure, FeeInstallment, Class, AcademicYear } from "@shared/schema";
+import type { FeeStructure, Class, AcademicYear } from "@shared/schema";
 
 export default function FeeManagement() {
   const { toast } = useToast();
-  const [activeTab, setActiveTab] = useState("structures");
   
   // Fee Structure state
   const [isStructureFormOpen, setIsStructureFormOpen] = useState(false);
   const [structureFormMode, setStructureFormMode] = useState<"add" | "edit" | "clone">("add");
   const [currentStructure, setCurrentStructure] = useState<FeeStructure | null>(null);
+  
+  // Format today's date as YYYY-MM-DD for the date input
+  const today = new Date();
+  const formattedDate = today.toISOString().split('T')[0];
+  
   const [structureFormData, setStructureFormData] = useState({
     name: "",
     classId: 0,
     academicYearId: 0,
     totalAmount: "",
-    description: ""
-  });
-
-  // Installment state
-  const [isInstallmentFormOpen, setIsInstallmentFormOpen] = useState(false);
-  const [installmentFormMode, setInstallmentFormMode] = useState<"add" | "edit">("add");
-  const [currentInstallment, setCurrentInstallment] = useState<FeeInstallment | null>(null);
-  const [selectedStructureId, setSelectedStructureId] = useState<number | null>(null);
-  // Format today's date as YYYY-MM-DD for the date input
-  const today = new Date();
-  const formattedDate = today.toISOString().split('T')[0];
-  
-  const [installmentFormData, setInstallmentFormData] = useState({
-    feeStructureId: 0,
-    name: "",
-    amount: "",
+    description: "",
     dueDate: formattedDate
   });
   
@@ -111,66 +98,16 @@ export default function FeeManagement() {
     return filtered;
   }, [feeStructures, selectedAcademicYearId, selectedFilterClassId]);
 
-  // Fetch fee installments
-  const { data: allInstallments, isLoading: isLoadingInstallments } = useQuery<FeeInstallment[]>({
-    queryKey: ["/api/fee-installments"],
-  });
-
-  // Filtered installments based on selected structure
-  const filteredInstallments = allInstallments?.filter(
-    installment => selectedStructureId === null || installment.feeStructureId === selectedStructureId
-  );
-
   // Add fee structure mutation
   const addStructureMutation = useMutation({
     mutationFn: (data: any) => 
       apiRequest("POST", "/api/fee-structures", data),
-    onSuccess: (data) => {
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/fee-structures"] });
-      
-      // Check if we need to clone installments (from localStorage)
-      const installmentsToCloneStr = localStorage.getItem('installmentsToClone');
-      if (installmentsToCloneStr && structureFormMode === "clone") {
-        try {
-          const installmentsToClone = JSON.parse(installmentsToCloneStr) as FeeInstallment[];
-          // Clear the storage immediately to avoid duplicate operations
-          localStorage.removeItem('installmentsToClone');
-          
-          if (installmentsToClone.length > 0) {
-            // Clone each installment to the new fee structure
-            installmentsToClone.forEach(installment => {
-              const newInstallment = {
-                feeStructureId: data.id, // New structure ID
-                name: installment.name,
-                amount: installment.amount,
-                dueDate: installment.dueDate
-              };
-              
-              // Create the new installment
-              apiRequest("POST", "/api/fee-installments", newInstallment)
-                .catch(error => console.error("Error cloning installment:", error));
-            });
-            
-            // Invalidate installments after cloning
-            queryClient.invalidateQueries({ queryKey: ["/api/fee-installments"] });
-            
-            // Show success message for cloning
-            toast({
-              title: "Success",
-              description: `Fee structure and ${installmentsToClone.length} installments cloned successfully`,
-            });
-          }
-        } catch (error) {
-          console.error("Error parsing installments to clone:", error);
-        }
-      } else {
-        // Show regular success message
-        toast({
-          title: "Success",
-          description: "Fee structure added successfully",
-        });
-      }
-      
+      toast({
+        title: "Success",
+        description: "Fee structure added successfully",
+      });
       setIsStructureFormOpen(false);
       resetStructureForm();
     },
@@ -225,95 +162,20 @@ export default function FeeManagement() {
     },
   });
 
-  // Add fee installment mutation
-  const addInstallmentMutation = useMutation({
-    mutationFn: (data: any) => 
-      apiRequest("POST", "/api/fee-installments", data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/fee-installments"] });
-      toast({
-        title: "Success",
-        description: "Fee installment added successfully",
-      });
-      setIsInstallmentFormOpen(false);
-      resetInstallmentForm();
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to add fee installment",
-        variant: "destructive",
-      });
-    },
-  });
-
-  // Update fee installment mutation
-  const updateInstallmentMutation = useMutation({
-    mutationFn: ({ id, data }: { id: number; data: any }) => 
-      apiRequest("PATCH", `/api/fee-installments/${id}`, data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/fee-installments"] });
-      toast({
-        title: "Success",
-        description: "Fee installment updated successfully",
-      });
-      setIsInstallmentFormOpen(false);
-      resetInstallmentForm();
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to update fee installment",
-        variant: "destructive",
-      });
-    },
-  });
-
-  // Delete fee installment mutation
-  const deleteInstallmentMutation = useMutation({
-    mutationFn: (id: number) => 
-      apiRequest("DELETE", `/api/fee-installments/${id}`),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/fee-installments"] });
-      toast({
-        title: "Success",
-        description: "Fee installment deleted successfully",
-      });
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to delete fee installment. It may have payments associated with it.",
-        variant: "destructive",
-      });
-    },
-  });
-
   // Reset fee structure form
   const resetStructureForm = () => {
-    setStructureFormData({
-      name: "",
-      classId: 0,
-      academicYearId: selectedAcademicYearId || 0,
-      totalAmount: "",
-      description: ""
-    });
-    setCurrentStructure(null);
-  };
-
-  // Reset fee installment form
-  const resetInstallmentForm = () => {
-    // Format today's date as YYYY-MM-DD for the date input
     const today = new Date();
     const formattedDate = today.toISOString().split('T')[0];
     
-    setInstallmentFormData({
-      feeStructureId: selectedStructureId || 0,
+    setStructureFormData({
       name: "",
-      amount: "",
+      classId: selectedFilterClassId || 0,
+      academicYearId: selectedAcademicYearId || 0,
+      totalAmount: "",
+      description: "",
       dueDate: formattedDate
     });
-    setCurrentInstallment(null);
+    setCurrentStructure(null);
   };
 
   // Handle edit fee structure
@@ -325,7 +187,8 @@ export default function FeeManagement() {
       classId: structure.classId,
       academicYearId: structure.academicYearId,
       totalAmount: structure.totalAmount,
-      description: structure.description || ""
+      description: structure.description || "",
+      dueDate: structure.dueDate || formattedDate
     });
     setIsStructureFormOpen(true);
   };
@@ -336,10 +199,11 @@ export default function FeeManagement() {
     setCurrentStructure(structure);
     setStructureFormData({
       name: `Copy of ${structure.name}`,
-      classId: 0, // Will need to be selected by user
+      classId: selectedFilterClassId || 0,
       academicYearId: selectedAcademicYearId || 0,
       totalAmount: structure.totalAmount,
-      description: structure.description || ""
+      description: structure.description || "",
+      dueDate: structure.dueDate || formattedDate
     });
     setIsStructureFormOpen(true);
   };
@@ -382,18 +246,6 @@ export default function FeeManagement() {
     if (structureFormMode === "add" || structureFormMode === "clone") {
       // Both add and clone create a new fee structure
       addStructureMutation.mutate(formDataToSubmit);
-      
-      // If cloning, we may want to also copy the installments
-      if (structureFormMode === "clone" && currentStructure) {
-        // Get installments for the current fee structure
-        const installmentsToClone = allInstallments?.filter(
-          installment => installment.feeStructureId === currentStructure.id
-        );
-        
-        // We need to wait for the new structure to be created before adding installments
-        // This will happen in onSuccess of the mutation
-        localStorage.setItem('installmentsToClone', JSON.stringify(installmentsToClone || []));
-      }
     } else {
       if (currentStructure) {
         updateStructureMutation.mutate({ 
@@ -415,111 +267,10 @@ export default function FeeManagement() {
     }));
   };
 
-  // Handle edit fee installment
-  const handleEditInstallment = (installment: FeeInstallment) => {
-    setInstallmentFormMode("edit");
-    setCurrentInstallment(installment);
-    setInstallmentFormData({
-      feeStructureId: installment.feeStructureId,
-      name: installment.name,
-      amount: installment.amount,
-      dueDate: installment.dueDate
-    });
-    setIsInstallmentFormOpen(true);
-  };
-
-  // Handle delete fee installment
-  const handleDeleteInstallment = (id: number) => {
-    if (window.confirm("Are you sure you want to delete this fee installment?")) {
-      deleteInstallmentMutation.mutate(id);
-    }
-  };
-
-  // Handle clone fee installment
-  const handleCloneInstallment = (installment: FeeInstallment) => {
-    // Set up the clone data - we'll use the same data but with a "Copy of" prefix for the name
-    const cloneData = {
-      feeStructureId: installment.feeStructureId,
-      name: `Copy of ${installment.name}`,
-      amount: installment.amount.toString(),
-      dueDate: new Date(installment.dueDate).toISOString().split('T')[0]
-    };
-    
-    // Set the form data with the clone values
-    setInstallmentFormData(cloneData);
-    
-    // Set the form mode to add (since we're creating a new installment)
-    setInstallmentFormMode("add");
-    
-    // Open the form dialog
-    setIsInstallmentFormOpen(true);
-    
-    // Set selected structure ID to make sure it's pre-selected
-    setSelectedStructureId(installment.feeStructureId);
-  };
-
-  // Handle installment form submission
-  const handleInstallmentSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    // Validate the form data
-    if (installmentFormData.feeStructureId === 0) {
-      toast({
-        title: "Validation Error",
-        description: "Please select a fee structure",
-        variant: "destructive",
-      });
-      return;
-    }
-    
-    const formDataToSubmit = {
-      ...installmentFormData,
-      amount: installmentFormData.amount.toString()
-    };
-    
-    if (installmentFormMode === "add") {
-      addInstallmentMutation.mutate(formDataToSubmit);
-    } else {
-      if (currentInstallment) {
-        updateInstallmentMutation.mutate({ 
-          id: currentInstallment.id, 
-          data: formDataToSubmit 
-        });
-      }
-    }
-  };
-
-  // Handle installment input change
-  const handleInstallmentInputChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
-  ) => {
-    const { name, value } = e.target;
-    setInstallmentFormData(prev => ({
-      ...prev,
-      [name]: name === "feeStructureId" ? parseInt(value) || 0 : value
-    }));
-  };
-
-  // Update installment form data when selected structure changes
-  useEffect(() => {
-    if (selectedStructureId) {
-      setInstallmentFormData(prev => ({
-        ...prev,
-        feeStructureId: selectedStructureId
-      }));
-    }
-  }, [selectedStructureId]);
-
   // Get class name by id
   const getClassName = (classId: number) => {
     const classItem = classes?.find(c => c.id === classId);
     return classItem ? classItem.name : "Unknown Class";
-  };
-
-  // Get fee structure name by id
-  const getStructureName = (structureId: number) => {
-    const structure = feeStructures?.find(s => s.id === structureId);
-    return structure ? structure.name : "Unknown Structure";
   };
   
   // Get academic year name by id
@@ -534,307 +285,179 @@ export default function FeeManagement() {
         <h1 className="text-2xl font-bold text-gray-900">Fee Management</h1>
       </div>
 
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-6">
-        <TabsList className="grid grid-cols-2 w-[400px]">
-          <TabsTrigger value="structures">Fee Structures</TabsTrigger>
-          <TabsTrigger value="installments">Installments</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="structures" className="mt-4">
-          <div className="space-y-6">
-            <div>
-              <h2 className="text-xl font-semibold mb-4">Fee Structures</h2>
-              
-              <Card className="mb-6">
-                <CardHeader>
-                  <CardTitle className="text-lg">Select Academic Year and Class</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="academicYearFilter">Academic Year</Label>
-                      <Select 
-                        value={selectedAcademicYearId?.toString() || ""} 
-                        onValueChange={(value) => {
-                          setSelectedAcademicYearId(parseInt(value));
-                          // Reset class filter when academic year changes
-                          setSelectedFilterClassId(null);
-                        }}
-                      >
-                        <SelectTrigger id="academicYearFilter" className="w-full">
-                          <SelectValue placeholder="Select Academic Year" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {academicYears?.map((year) => (
-                            <SelectItem key={year.id} value={year.id.toString()}>
-                              {year.name} {year.isCurrent && "(Current)"}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <Label htmlFor="classFilter">Class</Label>
-                      <Select 
-                        value={selectedFilterClassId?.toString() || ""} 
-                        onValueChange={(value) => setSelectedFilterClassId(parseInt(value))}
-                        disabled={!selectedAcademicYearId}
-                      >
-                        <SelectTrigger id="classFilter" className="w-full">
-                          <SelectValue placeholder="Class" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {classes?.map((classItem) => (
-                            <SelectItem key={classItem.id} value={classItem.id.toString()}>
-                              {classItem.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-                  
-                  <div className="mt-4 flex justify-end">
-                    <Button 
-                      onClick={() => {
-                        if (!selectedAcademicYearId || !selectedFilterClassId) {
-                          toast({
-                            title: "Selection Required",
-                            description: "Please select both Academic Year and Class before creating a fee structure",
-                            variant: "destructive"
-                          });
-                          return;
-                        }
-                        setStructureFormMode("add");
-                        // Pre-fill the form with the selected academic year and class
-                        setStructureFormData(prev => ({
-                          ...prev,
-                          academicYearId: selectedAcademicYearId,
-                          classId: selectedFilterClassId,
-                          name: "",
-                          totalAmount: "",
-                          description: ""
-                        }));
-                        setIsStructureFormOpen(true);
-                      }}
-                    >
-                      <PlusCircleIcon className="mr-2 h-4 w-4" /> Create New Fee Structure
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-              
-              {(!selectedAcademicYearId || !selectedFilterClassId) ? (
-                <Card>
-                  <CardContent className="pt-6">
-                    <div className="text-center text-muted-foreground">
-                      <LayersIcon className="mx-auto h-12 w-12 text-muted-foreground/50 mb-4" />
-                      <h3 className="text-lg font-medium mb-2">Please Select Academic Year and Class</h3>
-                      <p>Fee structures will be displayed once you select both an academic year and a class.</p>
-                    </div>
-                  </CardContent>
-                </Card>
-              ) : (
-                <div>
-                  <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-lg font-medium">
-                      Fee Structures for {getAcademicYearName(selectedAcademicYearId)} - {getClassName(selectedFilterClassId)}
-                    </h3>
-                  </div>
-                  <div className="bg-white shadow rounded-lg">
-                    <DataTable
-                      data={filteredFeeStructures || []}
-                      isLoading={isLoadingStructures}
-                      searchKey="name"
-                      columns={[
-                        {
-                          accessorKey: "name",
-                          header: "Structure Name",
-                          cell: (item) => (
-                            <div className="text-sm font-medium text-gray-900">{item.name}</div>
-                          )
-                        },
-                        {
-                          accessorKey: "totalAmount",
-                          header: "Total Amount",
-                          cell: (item) => (
-                            <div className="text-sm text-gray-900">${parseFloat(item.totalAmount).toFixed(2)}</div>
-                          )
-                        },
-                        {
-                          accessorKey: "id",
-                          header: "Actions",
-                          cell: (item) => (
-                            <div className="flex space-x-2">
-                              <Button 
-                                variant="outline" 
-                                size="sm" 
-                                onClick={() => {
-                                  setSelectedStructureId(item.id);
-                                  setActiveTab("installments");
-                                }}
-                                title="View Installments"
-                              >
-                                <LayersIcon className="h-4 w-4" />
-                              </Button>
-                              <Button 
-                                variant="outline" 
-                                size="sm"
-                                title="Clone Fee Structure"
-                                onClick={() => handleCloneFeeStructure(item)}
-                              >
-                                <CopyIcon className="h-4 w-4" />
-                              </Button>
-                              <Button 
-                                variant="outline" 
-                                size="sm"
-                                title="Edit Fee Structure"
-                                onClick={() => handleEditStructure(item)}
-                              >
-                                <PencilIcon className="h-4 w-4" />
-                              </Button>
-                              <Button 
-                                variant="destructive" 
-                                size="sm"
-                                title="Delete Fee Structure"
-                                onClick={() => handleDeleteStructure(item.id)}
-                              >
-                                <TrashIcon className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          )
-                        }
-                      ]}
-                    />
-                  </div>
+      <div className="space-y-6">
+        <div>
+          <h2 className="text-xl font-semibold mb-4">Fee Structures</h2>
+          
+          <Card className="mb-6">
+            <CardHeader>
+              <CardTitle className="text-lg">Select Academic Year and Class</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="academicYearFilter">Academic Year</Label>
+                  <Select 
+                    value={selectedAcademicYearId?.toString() || ""} 
+                    onValueChange={(value) => {
+                      setSelectedAcademicYearId(parseInt(value));
+                      // Reset class filter when academic year changes
+                      setSelectedFilterClassId(null);
+                    }}
+                  >
+                    <SelectTrigger id="academicYearFilter" className="w-full">
+                      <SelectValue placeholder="Select Academic Year" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {academicYears?.map((year) => (
+                        <SelectItem key={year.id} value={year.id.toString()}>
+                          {year.name} {year.isCurrent && "(Current)"}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
-              )}
-            </div>
-          </div>
-        </TabsContent>
-
-        <TabsContent value="installments" className="mt-4">
-          <div className="flex justify-between mb-4">
-            <div className="flex items-center space-x-4">
-              <h2 className="text-xl font-semibold">Installments</h2>
-              <Select 
-                value={selectedStructureId?.toString() || "all"} 
-                onValueChange={(value) => setSelectedStructureId(value !== "all" ? parseInt(value) : null)}
-              >
-                <SelectTrigger className="w-[250px]">
-                  <SelectValue placeholder="Filter by Fee Structure" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Fee Structures</SelectItem>
-                  {(selectedAcademicYearId ? filteredFeeStructures : feeStructures)?.map((structure) => (
-                    <SelectItem key={structure.id} value={structure.id.toString()}>
-                      {structure.name} - {getAcademicYearName(structure.academicYearId)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <Button 
-              onClick={() => {
-                setInstallmentFormMode("add");
-                resetInstallmentForm();
-                setIsInstallmentFormOpen(true);
-              }}
-              disabled={!selectedStructureId}
-            >
-              <PlusCircleIcon className="mr-2 h-4 w-4" /> Add Installment
-            </Button>
-          </div>
-
-          {!selectedStructureId && (
-            <Card className="mb-4">
+                
+                <div className="space-y-2">
+                  <Label htmlFor="classFilter">Class</Label>
+                  <Select 
+                    value={selectedFilterClassId?.toString() || ""} 
+                    onValueChange={(value) => setSelectedFilterClassId(parseInt(value))}
+                    disabled={!selectedAcademicYearId}
+                  >
+                    <SelectTrigger id="classFilter" className="w-full">
+                      <SelectValue placeholder="Class" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {classes?.map((classItem) => (
+                        <SelectItem key={classItem.id} value={classItem.id.toString()}>
+                          {classItem.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              
+              <div className="mt-4 flex justify-end">
+                <Button 
+                  onClick={() => {
+                    if (!selectedAcademicYearId || !selectedFilterClassId) {
+                      toast({
+                        title: "Selection Required",
+                        description: "Please select both Academic Year and Class before creating a fee structure",
+                        variant: "destructive"
+                      });
+                      return;
+                    }
+                    setStructureFormMode("add");
+                    // Pre-fill the form with the selected academic year and class
+                    const today = new Date();
+                    const formattedDate = today.toISOString().split('T')[0];
+                    
+                    setStructureFormData(prev => ({
+                      ...prev,
+                      academicYearId: selectedAcademicYearId,
+                      classId: selectedFilterClassId,
+                      name: "",
+                      totalAmount: "",
+                      description: "",
+                      dueDate: formattedDate
+                    }));
+                    setIsStructureFormOpen(true);
+                  }}
+                >
+                  <PlusCircleIcon className="mr-2 h-4 w-4" /> Create New Fee Structure
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+          
+          {(!selectedAcademicYearId || !selectedFilterClassId) ? (
+            <Card>
               <CardContent className="pt-6">
                 <div className="text-center text-muted-foreground">
                   <LayersIcon className="mx-auto h-12 w-12 text-muted-foreground/50 mb-4" />
-                  <h3 className="text-lg font-medium mb-2">Select a Fee Structure</h3>
-                  <p>Please select a fee structure to add installments or view installments for a specific structure.</p>
+                  <h3 className="text-lg font-medium mb-2">Please Select Academic Year and Class</h3>
+                  <p>Fee structures will be displayed once you select both an academic year and a class.</p>
                 </div>
               </CardContent>
             </Card>
+          ) : (
+            <div>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-medium">
+                  Fee Structures for {getAcademicYearName(selectedAcademicYearId)} - {getClassName(selectedFilterClassId)}
+                </h3>
+              </div>
+              <div className="bg-white shadow rounded-lg">
+                <DataTable
+                  data={filteredFeeStructures || []}
+                  isLoading={isLoadingStructures}
+                  searchKey="name"
+                  columns={[
+                    {
+                      accessorKey: "name",
+                      header: "Structure Name",
+                      cell: (item) => (
+                        <div className="text-sm font-medium text-gray-900">{item.name}</div>
+                      )
+                    },
+                    {
+                      accessorKey: "totalAmount",
+                      header: "Total Amount",
+                      cell: (item) => (
+                        <div className="text-sm text-gray-900">${parseFloat(item.totalAmount).toFixed(2)}</div>
+                      )
+                    },
+                    {
+                      accessorKey: "dueDate",
+                      header: "Due Date",
+                      cell: (item) => (
+                        <div className="text-sm text-gray-900">
+                          {item.dueDate ? format(new Date(item.dueDate), "MMM d, yyyy") : "N/A"}
+                        </div>
+                      )
+                    },
+                    {
+                      accessorKey: "id",
+                      header: "Actions",
+                      cell: (item) => (
+                        <div className="flex space-x-2">
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            title="Clone Fee Structure"
+                            onClick={() => handleCloneFeeStructure(item)}
+                          >
+                            <CopyIcon className="h-4 w-4" />
+                          </Button>
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            title="Edit Fee Structure"
+                            onClick={() => handleEditStructure(item)}
+                          >
+                            <PencilIcon className="h-4 w-4" />
+                          </Button>
+                          <Button 
+                            variant="destructive" 
+                            size="sm"
+                            title="Delete Fee Structure"
+                            onClick={() => handleDeleteStructure(item.id)}
+                          >
+                            <TrashIcon className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      )
+                    }
+                  ]}
+                />
+              </div>
+            </div>
           )}
-
-          <div className="bg-white shadow rounded-lg">
-            <DataTable
-              data={filteredInstallments || []}
-              isLoading={isLoadingInstallments}
-              searchKey="name"
-              columns={[
-                {
-                  accessorKey: "name",
-                  header: "Installment Name",
-                  cell: (item) => (
-                    <div className="text-sm font-medium text-gray-900">{item.name}</div>
-                  )
-                },
-                {
-                  accessorKey: "feeStructureId",
-                  header: "Fee Structure",
-                  cell: (item) => (
-                    <Badge className="bg-primary-100 text-primary-800 hover:bg-primary-100">
-                      {getStructureName(item.feeStructureId)}
-                    </Badge>
-                  )
-                },
-                {
-                  accessorKey: "amount",
-                  header: "Amount",
-                  cell: (item) => (
-                    <div className="text-sm text-gray-900">${parseFloat(item.amount).toFixed(2)}</div>
-                  )
-                },
-                {
-                  accessorKey: "dueDate",
-                  header: "Due Date",
-                  cell: (item) => (
-                    <div className="text-sm text-gray-700 flex items-center">
-                      <CalendarIcon className="h-3 w-3 mr-1" />
-                      {format(new Date(item.dueDate), "MMM d, yyyy")}
-                    </div>
-                  )
-                },
-                {
-                  accessorKey: "id",
-                  header: "Actions",
-                  cell: (item) => (
-                    <div className="flex space-x-2">
-                      <Button 
-                        variant="outline" 
-                        size="sm"
-                        title="Clone Installment" 
-                        onClick={() => handleCloneInstallment(item)}
-                      >
-                        <CopyIcon className="h-4 w-4" />
-                      </Button>
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        title="Edit Installment"
-                        onClick={() => handleEditInstallment(item)}
-                      >
-                        <PencilIcon className="h-4 w-4" />
-                      </Button>
-                      <Button 
-                        variant="destructive" 
-                        size="sm" 
-                        title="Delete Installment"
-                        onClick={() => handleDeleteInstallment(item.id)}
-                      >
-                        <TrashIcon className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  )
-                }
-              ]}
-            />
-          </div>
-        </TabsContent>
-      </Tabs>
+        </div>
+      </div>
 
       {/* Fee Structure Form Dialog */}
       <Dialog open={isStructureFormOpen} onOpenChange={setIsStructureFormOpen}>
@@ -858,31 +481,32 @@ export default function FeeManagement() {
 
           <form onSubmit={handleStructureSubmit} className="space-y-4">
             <div className="grid grid-cols-1 gap-4">
-              {/* Academic Year selector - first! */}
+              {/* Academic Year selector - first and read-only */}
               <div className="space-y-2">
                 <Label htmlFor="academicYearId">Academic Year</Label>
-                <Select 
-                  value={structureFormData.academicYearId.toString()} 
-                  onValueChange={(value) => {
-                    const yearId = parseInt(value);
-                    setStructureFormData(prev => ({
-                      ...prev,
-                      academicYearId: yearId
-                    }));
-                    setSelectedAcademicYearId(yearId);
-                  }}
-                >
-                  <SelectTrigger id="academicYearId">
-                    <SelectValue placeholder="Select academic year" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {academicYears?.map((year) => (
-                      <SelectItem key={year.id} value={year.id.toString()}>
-                        {year.name} {year.isCurrent && "(Current)"}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <div className="border rounded-md px-3 py-2 bg-muted text-muted-foreground">
+                  {getAcademicYearName(structureFormData.academicYearId)}
+                  <Input
+                    id="academicYearId"
+                    name="academicYearId"
+                    type="hidden"
+                    value={structureFormData.academicYearId}
+                  />
+                </div>
+              </div>
+              
+              {/* Class selector - second and read-only */}
+              <div className="space-y-2">
+                <Label htmlFor="classId">Class</Label>
+                <div className="border rounded-md px-3 py-2 bg-muted text-muted-foreground">
+                  {getClassName(structureFormData.classId)}
+                  <Input
+                    id="classId"
+                    name="classId"
+                    type="hidden"
+                    value={structureFormData.classId}
+                  />
+                </div>
               </div>
             
               <div className="space-y-2">
@@ -895,30 +519,6 @@ export default function FeeManagement() {
                   placeholder="e.g., Standard Tuition - Toddler"
                   required
                 />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="classId">Class</Label>
-                <Select 
-                  value={structureFormData.classId.toString()} 
-                  onValueChange={(value) => {
-                    setStructureFormData(prev => ({
-                      ...prev,
-                      classId: parseInt(value)
-                    }));
-                  }}
-                >
-                  <SelectTrigger id="classId">
-                    <SelectValue placeholder="Class" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {classes?.map((classItem) => (
-                      <SelectItem key={classItem.id} value={classItem.id.toString()}>
-                        {classItem.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
               </div>
 
               <div className="space-y-2">
@@ -938,6 +538,18 @@ export default function FeeManagement() {
                     required
                   />
                 </div>
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="dueDate">Due Date</Label>
+                <Input
+                  id="dueDate"
+                  name="dueDate"
+                  type="date"
+                  value={structureFormData.dueDate}
+                  onChange={handleStructureInputChange}
+                  required
+                />
               </div>
 
               <div className="space-y-2">
@@ -973,112 +585,6 @@ export default function FeeManagement() {
                   : structureFormMode === "clone" 
                     ? "Clone Structure" 
                     : "Update Structure"}
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
-
-      {/* Fee Installment Form Dialog */}
-      <Dialog open={isInstallmentFormOpen} onOpenChange={setIsInstallmentFormOpen}>
-        <DialogContent className="sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle>
-              {installmentFormMode === "add" ? "Add Installment" : "Edit Installment"}
-            </DialogTitle>
-            <DialogDescription>
-              {installmentFormMode === "add" 
-                ? "Create a new installment for the selected fee structure." 
-                : "Update the details of this installment."}
-            </DialogDescription>
-          </DialogHeader>
-
-          <form onSubmit={handleInstallmentSubmit} className="space-y-4">
-            <div className="grid grid-cols-1 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="feeStructureId">Fee Structure</Label>
-                <Select 
-                  value={installmentFormData.feeStructureId.toString()} 
-                  onValueChange={(value) => {
-                    setInstallmentFormData(prev => ({
-                      ...prev,
-                      feeStructureId: parseInt(value)
-                    }));
-                  }}
-                >
-                  <SelectTrigger id="feeStructureId">
-                    <SelectValue placeholder="Fee Structure" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {feeStructures?.map((structure) => (
-                      <SelectItem key={structure.id} value={structure.id.toString()}>
-                        {structure.name} - {getClassName(structure.classId)}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            
-              <div className="space-y-2">
-                <Label htmlFor="name">Installment Name</Label>
-                <Input
-                  id="name"
-                  name="name"
-                  value={installmentFormData.name}
-                  onChange={handleInstallmentInputChange}
-                  placeholder="e.g., Fall Term"
-                  required
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="amount">Amount</Label>
-                <div className="relative">
-                  <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-500">$</span>
-                  <Input
-                    id="amount"
-                    name="amount"
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={installmentFormData.amount}
-                    onChange={handleInstallmentInputChange}
-                    className="pl-7"
-                    placeholder="0.00"
-                    required
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="dueDate">Due Date</Label>
-                <Input
-                  id="dueDate"
-                  name="dueDate"
-                  type="date"
-                  value={installmentFormData.dueDate}
-                  onChange={handleInstallmentInputChange}
-                  required
-                />
-              </div>
-            </div>
-
-            <DialogFooter>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => {
-                  setIsInstallmentFormOpen(false);
-                  resetInstallmentForm();
-                }}
-              >
-                Cancel
-              </Button>
-              <Button 
-                type="submit"
-                disabled={addInstallmentMutation.isPending || updateInstallmentMutation.isPending}
-              >
-                {installmentFormMode === "add" ? "Add Installment" : "Update Installment"}
               </Button>
             </DialogFooter>
           </form>
