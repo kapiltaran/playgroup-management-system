@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { PencilIcon, TrashIcon, PlusCircleIcon } from "lucide-react";
@@ -11,7 +11,20 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import type { Class } from "@shared/schema";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import type { AcademicYear } from "@shared/schema";
+
+// Extended Class type with additional UI fields
+interface Class {
+  id: number;
+  name: string;
+  description: string | null;
+  academicYearId: number;
+  createdAt: Date | null;
+  // UI-specific fields that aren't in the database schema
+  ageGroup?: string;
+  capacity?: number;
+}
 
 export default function Classes() {
   const { toast } = useToast();
@@ -22,8 +35,55 @@ export default function Classes() {
     name: "",
     ageGroup: "",
     capacity: 0,
-    description: ""
+    description: "",
+    academicYearId: 0
   });
+
+  // Fetch academic years
+  const { data: academicYears, isLoading: isLoadingYears } = useQuery<AcademicYear[]>({
+    queryKey: ["/api/academic-years"],
+    queryFn: async () => {
+      const response = await fetch('/api/academic-years', {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include'
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Error ${response.status}: ${response.statusText}`);
+      }
+      
+      return response.json();
+    }
+  });
+
+  // Fetch current academic year
+  const { data: currentYear } = useQuery<AcademicYear>({
+    queryKey: ["/api/academic-years/current"],
+    queryFn: async () => {
+      const response = await fetch('/api/academic-years/current', {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include'
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Error ${response.status}: ${response.statusText}`);
+      }
+      
+      return response.json();
+    }
+  });
+
+  // Set default academic year when available
+  useEffect(() => {
+    if (currentYear && formData.academicYearId === 0) {
+      setFormData(prev => ({
+        ...prev,
+        academicYearId: currentYear.id
+      }));
+    }
+  }, [currentYear]);
 
   // Fetch classes
   const { data: classes, isLoading } = useQuery<Class[]>({
@@ -114,7 +174,8 @@ export default function Classes() {
       name: "",
       ageGroup: "",
       capacity: 0,
-      description: ""
+      description: "",
+      academicYearId: 0
     });
     setCurrentClass(null);
   };
@@ -125,9 +186,10 @@ export default function Classes() {
     setCurrentClass(classItem);
     setFormData({
       name: classItem.name,
-      ageGroup: classItem.ageGroup,
-      capacity: classItem.capacity,
-      description: classItem.description || ""
+      ageGroup: classItem.ageGroup || "",
+      capacity: classItem.capacity || 0,
+      description: classItem.description || "",
+      academicYearId: classItem.academicYearId
     });
     setIsFormOpen(true);
   };
@@ -158,6 +220,14 @@ export default function Classes() {
     setFormData(prev => ({
       ...prev,
       [name]: name === "capacity" ? parseInt(value) || 0 : value
+    }));
+  };
+
+  // Handle select change for academic year
+  const handleAcademicYearChange = (value: string) => {
+    setFormData(prev => ({
+      ...prev,
+      academicYearId: parseInt(value)
     }));
   };
 
@@ -283,6 +353,26 @@ export default function Classes() {
                   min={1}
                   required
                 />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="academicYearId">Academic Year</Label>
+                <Select
+                  value={formData.academicYearId.toString()}
+                  onValueChange={handleAcademicYearChange}
+                  required
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select Academic Year" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {academicYears?.map((year) => (
+                      <SelectItem key={year.id} value={year.id.toString()}>
+                        {year.name} {year.isCurrent && "(Current)"}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
 
               <div className="space-y-2">
