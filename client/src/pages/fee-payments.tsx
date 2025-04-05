@@ -516,10 +516,10 @@ export default function FeePayments() {
                   )
                 },
                 {
-                  accessorKey: "installmentName",
-                  header: "Installment",
+                  accessorKey: "feeName",
+                  header: "Fee Structure",
                   cell: (item) => (
-                    <div className="text-sm text-gray-700">{item.installmentName}</div>
+                    <div className="text-sm text-gray-700">{item.feeName}</div>
                   )
                 },
                 {

@@ -832,15 +832,15 @@ export class MemStorage implements IStorage {
   }
 
   // Fee Payment methods
-  async getFeePayments(studentId?: number, installmentId?: number): Promise<FeePayment[]> {
+  async getFeePayments(studentId?: number, feeStructureId?: number): Promise<FeePayment[]> {
     let payments = Array.from(this.feePayments.values());
     
     if (studentId) {
       payments = payments.filter(payment => payment.studentId === studentId);
     }
     
-    if (installmentId) {
-      payments = payments.filter(payment => payment.installmentId === installmentId);
+    if (feeStructureId) {
+      payments = payments.filter(payment => payment.feeStructureId === feeStructureId);
     }
     
     return payments.sort((a, b) => b.id - a.id);
@@ -862,9 +862,9 @@ export class MemStorage implements IStorage {
     };
     this.feePayments.set(id, newPayment);
     
-    // Get student and installment details for the activity log
+    // Get student and fee structure details for the activity log
     const student = this.students.get(newPayment.studentId);
-    const installment = this.feeInstallments.get(newPayment.installmentId);
+    const feeStructure = this.feeStructures.get(newPayment.feeStructureId);
     
     // Log activity
     this.createActivity({
@@ -873,7 +873,7 @@ export class MemStorage implements IStorage {
       details: { 
         paymentId: id, 
         studentName: student?.fullName || 'Unknown', 
-        installmentName: installment?.name || 'Unknown',
+        feeName: feeStructure?.name || 'Unknown',
         amount: newPayment.amount
       }
     });
@@ -1018,7 +1018,7 @@ export class MemStorage implements IStorage {
         .filter(student => student.status === 'active');
     }
     
-    // Get fee installments and payments for students
+    // Get fee structures and payments for students
     const result = [];
     
     for (const student of students) {
@@ -1028,44 +1028,36 @@ export class MemStorage implements IStorage {
       const feeStructure = this.feeStructures.get(student.feeStructureId);
       if (!feeStructure) continue;
       
-      // Get installments for this fee structure
-      const installments = Array.from(this.feeInstallments.values())
-        .filter(inst => inst.feeStructureId === feeStructure.id);
+      // Get payments for this student and fee structure
+      const payments = Array.from(this.feePayments.values())
+        .filter(payment => 
+          payment.studentId === student.id && 
+          payment.feeStructureId === feeStructure.id
+        );
       
-      for (const installment of installments) {
-        // Check if payment for this installment exists
-        const payments = Array.from(this.feePayments.values())
-          .filter(payment => 
-            payment.studentId === student.id && 
-            payment.installmentId === installment.id
-          );
-        
-        // Calculate total paid amount
-        const totalPaid = payments.reduce((sum, payment) => {
-          return sum + parseFloat(payment.amount.toString());
-        }, 0);
-        
-        // Calculate due amount
-        const dueAmount = parseFloat(installment.amount.toString()) - totalPaid;
-        
-        // Add to result if there's a pending amount
-        if (dueAmount > 0) {
-          result.push({
-            studentId: student.id,
-            studentName: student.fullName,
-            classId: student.classId,
-            className: student.classId ? (this.classes.get(student.classId)?.name || 'Unknown') : 'Not Assigned',
-            feeStructureId: feeStructure.id,
-            feeStructureName: feeStructure.name,
-            installmentId: installment.id,
-            installmentName: installment.name,
-            dueDate: installment.dueDate,
-            totalAmount: installment.amount,
-            paidAmount: totalPaid,
-            dueAmount,
-            status: new Date(installment.dueDate) < new Date() ? 'overdue' : 'upcoming'
-          });
-        }
+      // Calculate total paid amount
+      const totalPaid = payments.reduce((sum, payment) => {
+        return sum + parseFloat(payment.amount.toString());
+      }, 0);
+      
+      // Calculate due amount
+      const dueAmount = parseFloat(feeStructure.totalAmount.toString()) - totalPaid;
+      
+      // Add to result if there's a pending amount
+      if (dueAmount > 0) {
+        result.push({
+          studentId: student.id,
+          studentName: student.fullName,
+          classId: student.classId,
+          className: student.classId ? (this.classes.get(student.classId)?.name || 'Unknown') : 'Not Assigned',
+          feeStructureId: feeStructure.id,
+          feeName: feeStructure.name,
+          dueDate: feeStructure.dueDate,
+          totalAmount: feeStructure.totalAmount,
+          paidAmount: totalPaid,
+          dueAmount,
+          status: feeStructure.dueDate && new Date(feeStructure.dueDate) < new Date() ? 'overdue' : 'upcoming'
+        });
       }
     }
     
@@ -1111,7 +1103,6 @@ export class MemStorage implements IStorage {
       totalCollected,
       paymentDetails: paymentsOnDate.map(payment => {
         const student = this.students.get(payment.studentId);
-        const installment = this.feeInstallments.get(payment.installmentId);
         
         return {
           paymentId: payment.id,
@@ -1120,7 +1111,7 @@ export class MemStorage implements IStorage {
           paymentMethod: payment.paymentMethod,
           receiptNumber: payment.receiptNumber,
           studentName: student ? student.fullName : 'Unknown',
-          installmentName: installment ? installment.name : 'Unknown'
+          feeName: this.feeStructures.get(payment.feeStructureId)?.name || 'Unknown'
         };
       }),
       summary: Object.entries(paymentsByMethod).map(([method, amount]) => ({
