@@ -144,6 +144,17 @@ export default function Batches() {
   const { data: currentAcademicYear } = useQuery<AcademicYear>({
     queryKey: ["/api/academic-years/current"],
   });
+  
+  // Select first class by default if available
+  useEffect(() => {
+    if (classes && classes.length > 0 && filteredAcademicYearId && !filteredClassId) {
+      // Filter classes by selected academic year
+      const academicYearClasses = classes.filter(c => c.academicYearId === filteredAcademicYearId);
+      if (academicYearClasses.length > 0) {
+        setFilteredClassId(academicYearClasses[0].id);
+      }
+    }
+  }, [classes, filteredAcademicYearId, filteredClassId]);
 
   // Set up mutations
   const createBatchMutation = useMutation({
@@ -269,16 +280,18 @@ export default function Batches() {
     }
   }, [currentAcademicYear, form]);
 
-  // Reset form when opening in add mode
+  // Handle add batch button click with current filter values
   const handleAddBatch = () => {
     setFormMode("add");
     setCurrentBatch(null);
+    
     form.reset({
       name: "",
-      academicYearId: currentAcademicYear ? currentAcademicYear.id.toString() : "",
-      classId: "",
+      academicYearId: filteredAcademicYearId ? filteredAcademicYearId.toString() : "",
+      classId: filteredClassId ? filteredClassId.toString() : "",
       capacity: 20,
     });
+    
     setIsFormOpen(true);
   };
 
@@ -322,58 +335,65 @@ export default function Batches() {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold">Batch Management</h1>
-        <Button onClick={handleAddBatch}>Add New Batch</Button>
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle>Filters</CardTitle>
-          <CardDescription>Filter batches by academic year and class</CardDescription>
+          <CardTitle>Select Academic Year and Class</CardTitle>
+          <CardDescription>Select an academic year and class to manage batches</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="academicYearFilter">Academic Year</Label>
-              <Select
-                value={filteredAcademicYearId?.toString() || "all"}
-                onValueChange={(value) => {
-                  setFilteredAcademicYearId(value === "all" ? null : parseInt(value));
-                  setFilteredClassId(null); // Reset class filter when academic year changes
-                }}
-              >
-                <SelectTrigger id="academicYearFilter">
-                  <SelectValue placeholder="All Academic Years" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Academic Years</SelectItem>
-                  {academicYears?.map((year) => (
-                    <SelectItem key={year.id} value={year.id.toString()}>
-                      {year.name} {year.isCurrent && "(Current)"}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="academicYearFilter">Academic Year</Label>
+                <Select
+                  value={filteredAcademicYearId?.toString() || ""}
+                  onValueChange={(value) => {
+                    setFilteredAcademicYearId(parseInt(value));
+                    setFilteredClassId(null); // Reset class filter when academic year changes
+                  }}
+                >
+                  <SelectTrigger id="academicYearFilter">
+                    <SelectValue placeholder="Select Academic Year" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {academicYears?.map((year) => (
+                      <SelectItem key={year.id} value={year.id.toString()}>
+                        {year.name} {year.isCurrent && "(Current)"}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="classFilter">Class</Label>
+                <Select
+                  value={filteredClassId?.toString() || ""}
+                  onValueChange={(value) => setFilteredClassId(parseInt(value))}
+                  disabled={filteredClasses.length === 0}
+                >
+                  <SelectTrigger id="classFilter">
+                    <SelectValue placeholder="Select Class" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {filteredClasses.map((classItem) => (
+                      <SelectItem key={classItem.id} value={classItem.id.toString()}>
+                        {classItem.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
-            <div>
-              <Label htmlFor="classFilter">Class</Label>
-              <Select
-                value={filteredClassId?.toString() || "all"}
-                onValueChange={(value) => setFilteredClassId(value === "all" ? null : parseInt(value))}
-                disabled={filteredClasses.length === 0}
-              >
-                <SelectTrigger id="classFilter">
-                  <SelectValue placeholder="All Classes" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Classes</SelectItem>
-                  {filteredClasses.map((classItem) => (
-                    <SelectItem key={classItem.id} value={classItem.id.toString()}>
-                      {classItem.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            
+            {filteredAcademicYearId && filteredClassId && (
+              <div className="flex justify-end mt-4">
+                <Button onClick={handleAddBatch}>
+                  Add New Batch
+                </Button>
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>
@@ -502,6 +522,7 @@ export default function Batches() {
                       onValueChange={field.onChange}
                       defaultValue={field.value}
                       value={field.value}
+                      disabled={formMode === "add" && filteredAcademicYearId !== null}
                     >
                       <FormControl>
                         <SelectTrigger>
@@ -516,6 +537,11 @@ export default function Batches() {
                         ))}
                       </SelectContent>
                     </Select>
+                    {formMode === "add" && filteredAcademicYearId && (
+                      <FormDescription>
+                        Using academic year selected in filter
+                      </FormDescription>
+                    )}
                     <FormMessage />
                   </FormItem>
                 )}
@@ -544,7 +570,7 @@ export default function Batches() {
                         onValueChange={field.onChange}
                         defaultValue={field.value}
                         value={field.value}
-                        disabled={availableClasses.length === 0}
+                        disabled={(availableClasses.length === 0) || (formMode === "add" && filteredClassId !== null)}
                       >
                         <FormControl>
                           <SelectTrigger>
@@ -565,6 +591,11 @@ export default function Batches() {
                           )}
                         </SelectContent>
                       </Select>
+                      {formMode === "add" && filteredClassId && (
+                        <FormDescription>
+                          Using class selected in filter
+                        </FormDescription>
+                      )}
                       <FormMessage />
                     </FormItem>
                   );
