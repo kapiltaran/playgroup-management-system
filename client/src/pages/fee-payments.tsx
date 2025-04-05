@@ -15,7 +15,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { useCurrency } from "@/hooks/use-currency";
-import type { Student, FeeInstallment, FeePayment, Reminder } from "@shared/schema";
+import type { Student, FeeStructure, FeePayment, Reminder } from "@shared/schema";
 
 // Define payment methods
 const PAYMENT_METHODS = [
@@ -39,7 +39,7 @@ export default function FeePayments() {
   const [currentPayment, setCurrentPayment] = useState<FeePayment | null>(null);
   const [paymentFormData, setPaymentFormData] = useState({
     studentId: 0,
-    installmentId: 0,
+    feeStructureId: 0,
     paymentDate: format(new Date(), "yyyy-MM-dd"),
     amount: "",
     paymentMethod: "Cash",
@@ -53,7 +53,7 @@ export default function FeePayments() {
   const [currentReminder, setCurrentReminder] = useState<Reminder | null>(null);
   const [reminderFormData, setReminderFormData] = useState({
     studentId: 0,
-    installmentId: 0,
+    feeStructureId: 0,
     message: "",
     status: "pending"
   });
@@ -63,9 +63,9 @@ export default function FeePayments() {
     queryKey: ["/api/students"],
   });
 
-  // Fetch all fee installments
-  const { data: installments } = useQuery<FeeInstallment[]>({
-    queryKey: ["/api/fee-installments"],
+  // Fetch all fee structures
+  const { data: feeStructures } = useQuery<FeeStructure[]>({
+    queryKey: ["/api/fee-structures"],
   });
 
   // Fetch pending fees (overdue and upcoming)
@@ -242,7 +242,7 @@ export default function FeePayments() {
   const resetPaymentForm = () => {
     setPaymentFormData({
       studentId: 0,
-      installmentId: 0,
+      feeStructureId: 0,
       paymentDate: format(new Date(), "yyyy-MM-dd"),
       amount: "",
       paymentMethod: "Cash",
@@ -256,7 +256,7 @@ export default function FeePayments() {
   const resetReminderForm = () => {
     setReminderFormData({
       studentId: 0,
-      installmentId: 0,
+      feeStructureId: 0,
       message: "",
       status: "pending"
     });
@@ -269,7 +269,7 @@ export default function FeePayments() {
     setCurrentPayment(payment);
     setPaymentFormData({
       studentId: payment.studentId,
-      installmentId: payment.installmentId,
+      feeStructureId: payment.feeStructureId,
       paymentDate: payment.paymentDate,
       amount: payment.amount,
       paymentMethod: payment.paymentMethod,
@@ -313,7 +313,7 @@ export default function FeePayments() {
   ) => {
     const { name, value } = e.target;
     
-    if (name === "studentId" || name === "installmentId") {
+    if (name === "studentId" || name === "feeStructureId") {
       setPaymentFormData(prev => ({
         ...prev,
         [name]: parseInt(value) || 0
@@ -332,7 +332,7 @@ export default function FeePayments() {
     setCurrentReminder(reminder);
     setReminderFormData({
       studentId: reminder.studentId,
-      installmentId: reminder.installmentId,
+      feeStructureId: reminder.feeStructureId,
       message: reminder.message,
       status: reminder.status
     });
@@ -368,7 +368,7 @@ export default function FeePayments() {
   ) => {
     const { name, value } = e.target;
     
-    if (name === "studentId" || name === "installmentId") {
+    if (name === "studentId" || name === "feeStructureId") {
       setReminderFormData(prev => ({
         ...prev,
         [name]: parseInt(value) || 0
@@ -392,9 +392,9 @@ export default function FeePayments() {
     return student ? student.fullName : "Unknown Student";
   };
 
-  const getInstallmentName = (installmentId: number) => {
-    const installment = installments?.find(i => i.id === installmentId);
-    return installment ? installment.name : "Unknown Installment";
+  const getFeeStructureName = (feeStructureId: number) => {
+    const feeStructure = feeStructures?.find(fs => fs.id === feeStructureId);
+    return feeStructure ? feeStructure.name : "Unknown Fee Structure";
   };
 
   // Prepare payment receipt number
@@ -410,23 +410,23 @@ export default function FeePayments() {
 
   // Auto-populate reminder message
   useEffect(() => {
-    if (reminderFormMode === "add" && reminderFormData.studentId && reminderFormData.installmentId) {
+    if (reminderFormMode === "add" && reminderFormData.studentId && reminderFormData.feeStructureId) {
       const selectedFee = pendingFees?.find(
         fee => fee.studentId === reminderFormData.studentId && 
-               fee.installmentId === reminderFormData.installmentId
+               fee.feeStructureId === reminderFormData.feeStructureId
       );
       
       if (selectedFee) {
         const studentName = getStudentName(selectedFee.studentId);
-        const installmentName = selectedFee.installmentName;
+        const feeName = getFeeStructureName(selectedFee.feeStructureId);
         const dueAmount = parseFloat(selectedFee.dueAmount).toFixed(2);
         const dueDate = format(new Date(selectedFee.dueDate), "MMMM d, yyyy");
         
         let defaultMessage = "";
         if (selectedFee.status === "overdue") {
-          defaultMessage = `Dear ${studentName}'s Parents,\n\nThis is a friendly reminder that your ${installmentName} payment of ${currencySymbol}${dueAmount} was due on ${dueDate} and is currently overdue. Please make the payment as soon as possible.\n\nThank you.`;
+          defaultMessage = `Dear ${studentName}'s Parents,\n\nThis is a friendly reminder that your ${feeName} payment of ${currencySymbol}${dueAmount} was due on ${dueDate} and is currently overdue. Please make the payment as soon as possible.\n\nThank you.`;
         } else {
-          defaultMessage = `Dear ${studentName}'s Parents,\n\nThis is a friendly reminder that your ${installmentName} payment of ${currencySymbol}${dueAmount} is due on ${dueDate}. Please ensure timely payment to avoid any late fees.\n\nThank you.`;
+          defaultMessage = `Dear ${studentName}'s Parents,\n\nThis is a friendly reminder that your ${feeName} payment of ${currencySymbol}${dueAmount} is due on ${dueDate}. Please ensure timely payment to avoid any late fees.\n\nThank you.`;
         }
         
         setReminderFormData(prev => ({
@@ -435,7 +435,7 @@ export default function FeePayments() {
         }));
       }
     }
-  }, [reminderFormMode, reminderFormData.studentId, reminderFormData.installmentId, pendingFees]);
+  }, [reminderFormMode, reminderFormData.studentId, reminderFormData.feeStructureId, pendingFees]);
 
   // Format status badge
   const formatStatusBadge = (status: string) => {
@@ -569,7 +569,7 @@ export default function FeePayments() {
                           setReminderFormMode("add");
                           setReminderFormData({
                             studentId: item.studentId,
-                            installmentId: item.installmentId,
+                            feeStructureId: item.feeStructureId,
                             message: "",
                             status: "pending"
                           });
@@ -586,7 +586,7 @@ export default function FeePayments() {
                           setPaymentFormData(prev => ({
                             ...prev,
                             studentId: item.studentId,
-                            installmentId: item.installmentId,
+                            feeStructureId: item.feeStructureId,
                             amount: item.dueAmount.toString()
                           }));
                           setIsPaymentFormOpen(true);
@@ -637,10 +637,10 @@ export default function FeePayments() {
                   )
                 },
                 {
-                  accessorKey: "installmentId",
-                  header: "Installment",
+                  accessorKey: "feeStructureId",
+                  header: "Fee Structure",
                   cell: (item) => (
-                    <div className="text-sm text-gray-700">{getInstallmentName(item.installmentId)}</div>
+                    <div className="text-sm text-gray-700">{getFeeStructureName(item.feeStructureId)}</div>
                   )
                 },
                 {
@@ -718,10 +718,10 @@ export default function FeePayments() {
                   )
                 },
                 {
-                  accessorKey: "installmentId",
-                  header: "Installment",
+                  accessorKey: "feeStructureId",
+                  header: "Fee Structure",
                   cell: (item) => (
-                    <div className="text-sm text-gray-700">{getInstallmentName(item.installmentId)}</div>
+                    <div className="text-sm text-gray-700">{getFeeStructureName(item.feeStructureId)}</div>
                   )
                 },
                 {
@@ -831,24 +831,24 @@ export default function FeePayments() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="installmentId">Fee Installment</Label>
+                <Label htmlFor="feeStructureId">Fee Structure</Label>
                 <Select 
-                  value={paymentFormData.installmentId.toString()} 
+                  value={paymentFormData.feeStructureId.toString()} 
                   onValueChange={(value) => {
                     setPaymentFormData(prev => ({
                       ...prev,
-                      installmentId: parseInt(value)
+                      feeStructureId: parseInt(value)
                     }));
                   }}
                   disabled={paymentFormMode === "edit"}
                 >
-                  <SelectTrigger id="installmentId">
-                    <SelectValue placeholder="Select an installment" />
+                  <SelectTrigger id="feeStructureId">
+                    <SelectValue placeholder="Select a fee structure" />
                   </SelectTrigger>
                   <SelectContent>
-                    {installments?.map((installment) => (
-                      <SelectItem key={installment.id} value={installment.id.toString()}>
-                        {getInstallmentName(installment.id)} - {formatCurrency(parseFloat(installment.amount))}
+                    {feeStructures?.map((feeStructure) => (
+                      <SelectItem key={feeStructure.id} value={feeStructure.id.toString()}>
+                        {feeStructure.name} - {formatCurrency(parseFloat(feeStructure.totalAmount))}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -1001,27 +1001,27 @@ export default function FeePayments() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="installmentId">Fee Installment</Label>
+                <Label htmlFor="feeStructureId">Fee Structure</Label>
                 <Select 
-                  value={reminderFormData.installmentId.toString()} 
+                  value={reminderFormData.feeStructureId.toString()} 
                   onValueChange={(value) => {
                     setReminderFormData(prev => ({
                       ...prev,
-                      installmentId: parseInt(value)
+                      feeStructureId: parseInt(value)
                     }));
                   }}
                 >
-                  <SelectTrigger id="installmentId">
-                    <SelectValue placeholder="Select an installment" />
+                  <SelectTrigger id="feeStructureId">
+                    <SelectValue placeholder="Select a fee structure" />
                   </SelectTrigger>
                   <SelectContent>
                     {pendingFees?.map((fee) => (
                       <SelectItem 
-                        key={`${fee.studentId}-${fee.installmentId}`} 
-                        value={fee.installmentId.toString()}
+                        key={`${fee.studentId}-${fee.feeStructureId}`} 
+                        value={fee.feeStructureId.toString()}
                         disabled={fee.studentId !== reminderFormData.studentId}
                       >
-                        {fee.installmentName} - {formatCurrency(parseFloat(fee.dueAmount))} ({fee.status})
+                        {fee.feeName} - {formatCurrency(parseFloat(fee.dueAmount))} ({fee.status})
                       </SelectItem>
                     ))}
                   </SelectContent>

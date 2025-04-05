@@ -99,30 +99,7 @@ export const insertFeeStructureSchema = createInsertSchema(feeStructures)
     };
   });
 
-// Fee installment schema
-export const feeInstallments = pgTable("fee_installments", {
-  id: serial("id").primaryKey(),
-  feeStructureId: integer("fee_structure_id").notNull().references(() => feeStructures.id),
-  name: text("name").notNull(), // e.g., "First Term", "Second Term"
-  amount: numeric("amount", { precision: 10, scale: 2 }).notNull(),
-  dueDate: date("due_date").notNull(),
-  createdAt: timestamp("created_at").defaultNow(),
-});
-
-export const insertFeeInstallmentSchema = createInsertSchema(feeInstallments)
-  .omit({
-    id: true,
-    createdAt: true,
-  })
-  .transform((data) => {
-    // Ensure amount is always a string in expected format
-    return {
-      ...data,
-      amount: typeof data.amount === 'string' 
-        ? data.amount 
-        : String(data.amount)
-    };
-  });
+// Removed fee installments as requested
 
 // Student schema
 export const students = pgTable("students", {
@@ -189,7 +166,7 @@ export const insertInventorySchema = createInsertSchema(inventory).omit({
 export const feePayments = pgTable("fee_payments", {
   id: serial("id").primaryKey(),
   studentId: integer("student_id").notNull().references(() => students.id),
-  installmentId: integer("installment_id").notNull().references(() => feeInstallments.id),
+  feeStructureId: integer("fee_structure_id").notNull().references(() => feeStructures.id),
   paymentDate: date("payment_date").notNull(),
   amount: numeric("amount", { precision: 10, scale: 2 }).notNull(),
   paymentMethod: text("payment_method").notNull(), // "Cash", "Check", "Online Transfer", etc.
@@ -217,7 +194,7 @@ export const insertFeePaymentSchema = createInsertSchema(feePayments)
 export const reminders = pgTable("reminders", {
   id: serial("id").primaryKey(),
   studentId: integer("student_id").notNull().references(() => students.id),
-  installmentId: integer("installment_id").notNull().references(() => feeInstallments.id),
+  feeStructureId: integer("fee_structure_id").notNull().references(() => feeStructures.id),
   status: text("status").notNull().default("pending"), // "pending", "sent", "viewed"
   sentDate: timestamp("sent_date"),
   message: text("message").notNull(),
@@ -359,8 +336,6 @@ export type Class = typeof classes.$inferSelect;
 export type InsertClass = z.infer<typeof insertClassSchema>;
 export type FeeStructure = typeof feeStructures.$inferSelect;
 export type InsertFeeStructure = z.infer<typeof insertFeeStructureSchema>;
-export type FeeInstallment = typeof feeInstallments.$inferSelect;
-export type InsertFeeInstallment = z.infer<typeof insertFeeInstallmentSchema>;
 export type FeePayment = typeof feePayments.$inferSelect;
 export type InsertFeePayment = z.infer<typeof insertFeePaymentSchema>;
 export type Reminder = typeof reminders.$inferSelect;

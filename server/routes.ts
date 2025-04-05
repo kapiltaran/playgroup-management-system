@@ -8,7 +8,6 @@ import {
   insertActivitySchema,
   insertClassSchema,
   insertFeeStructureSchema,
-  insertFeeInstallmentSchema,
   insertFeePaymentSchema,
   insertReminderSchema,
   insertSettingsSchema,
@@ -774,99 +773,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  // Fee Installments API
-  app.get("/api/fee-installments", async (req: Request, res: Response) => {
-    try {
-      const feeStructureId = req.query.feeStructureId ? parseInt(req.query.feeStructureId as string) : undefined;
-      const installments = await storage.getFeeInstallments(feeStructureId);
-      res.json(installments);
-    } catch (error) {
-      console.error("Error fetching fee installments:", error);
-      res.status(500).json({ message: "Failed to fetch fee installments" });
-    }
-  });
-  
-  app.get("/api/fee-installments/:id", async (req: Request, res: Response) => {
-    try {
-      const installmentId = parseInt(req.params.id);
-      if (isNaN(installmentId)) {
-        return res.status(400).json({ message: "Invalid installment ID" });
-      }
-      
-      const installment = await storage.getFeeInstallment(installmentId);
-      if (!installment) {
-        return res.status(404).json({ message: "Fee installment not found" });
-      }
-      
-      res.json(installment);
-    } catch (error) {
-      console.error("Error fetching fee installment:", error);
-      res.status(500).json({ message: "Failed to fetch fee installment" });
-    }
-  });
-  
-  app.post("/api/fee-installments", async (req: Request, res: Response) => {
-    try {
-      const insertData = insertFeeInstallmentSchema.parse(req.body);
-      const installment = await storage.createFeeInstallment(insertData);
-      res.status(201).json(installment);
-    } catch (error) {
-      handleZodError(error, res);
-    }
-  });
-  
-  app.patch("/api/fee-installments/:id", async (req: Request, res: Response) => {
-    try {
-      const installmentId = parseInt(req.params.id);
-      if (isNaN(installmentId)) {
-        return res.status(400).json({ message: "Invalid installment ID" });
-      }
-      
-      const updateData = z.object({
-        feeStructureId: z.number().optional(),
-        name: z.string().optional(),
-        amount: z.string().optional(),
-        dueDate: z.string().optional()
-      }).parse(req.body);
-      const updatedInstallment = await storage.updateFeeInstallment(installmentId, updateData);
-      
-      if (!updatedInstallment) {
-        return res.status(404).json({ message: "Fee installment not found" });
-      }
-      
-      res.json(updatedInstallment);
-    } catch (error) {
-      handleZodError(error, res);
-    }
-  });
-  
-  app.delete("/api/fee-installments/:id", async (req: Request, res: Response) => {
-    try {
-      const installmentId = parseInt(req.params.id);
-      if (isNaN(installmentId)) {
-        return res.status(400).json({ message: "Invalid installment ID" });
-      }
-      
-      const success = await storage.deleteFeeInstallment(installmentId);
-      
-      if (!success) {
-        return res.status(400).json({ 
-          message: "Cannot delete installment. It may have payments or reminders associated with it." 
-        });
-      }
-      
-      res.status(204).end();
-    } catch (error) {
-      console.error("Error deleting fee installment:", error);
-      res.status(500).json({ message: "Failed to delete fee installment" });
-    }
-  });
+  // Fee installments API removed as per restructuring
+  // Fees are now directly associated with fee structures
   
   // Fee Payments API
   app.get("/api/fee-payments", async (req: Request, res: Response) => {
     try {
       const studentId = req.query.studentId ? parseInt(req.query.studentId as string) : undefined;
-      const installmentId = req.query.installmentId ? parseInt(req.query.installmentId as string) : undefined;
+      const feeStructureId = req.query.feeStructureId ? parseInt(req.query.feeStructureId as string) : undefined;
       
       // Check if the request has a user property (from an auth middleware)
       const user = (req as any).user;
@@ -897,7 +811,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Get payments for all their students
         let allPayments: any[] = [];
         for (const student of allowedStudents) {
-          const studentPayments = await storage.getFeePayments(student.id, installmentId);
+          const studentPayments = await storage.getFeePayments(student.id, feeStructureId);
           allPayments = allPayments.concat(studentPayments);
         }
         
@@ -906,7 +820,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // For non-parent users or when parent requests their specific student with proper access
-      const payments = await storage.getFeePayments(studentId, installmentId);
+      const payments = await storage.getFeePayments(studentId, feeStructureId);
       res.json(payments);
     } catch (error) {
       console.error("Error fetching fee payments:", error);
@@ -969,7 +883,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const updateData = z.object({
         studentId: z.number().optional(),
-        installmentId: z.number().optional(),
+        feeStructureId: z.number().optional(),
         paymentDate: z.string().optional(),
         amount: z.string().optional(),
         paymentMethod: z.string().optional(),
@@ -1114,7 +1028,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const updateData = z.object({
         studentId: z.number().optional(),
-        installmentId: z.number().optional(),
+        feeStructureId: z.number().optional(),
         status: z.string().optional(),
         sentDate: z.date().optional().nullable(),
         message: z.string().optional()
