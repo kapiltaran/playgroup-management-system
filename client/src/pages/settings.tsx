@@ -75,16 +75,26 @@ function CurrencySettings() {
       return apiRequest("POST", "/api/settings", {
         key: "currency",
         value: data.value,
-        description: "Default currency for fees and expenses"
+        description: "Default currency for fees and expenses",
+        oldValue: currencySetting?.value || "USD" // Track the old value for auditing
       });
     },
     onSuccess: () => {
+      // More aggressively invalidate and refetch the currency query
       queryClient.invalidateQueries({ queryKey: ["/api/settings/currency"] });
-      toast({
-        title: "Currency updated",
-        description: "Your currency preference has been saved.",
-      });
-      setIsEditing(false);
+      queryClient.refetchQueries({ queryKey: ["/api/settings/currency"], type: 'active' });
+      
+      // Add a slight delay before showing success message to allow refetching to complete
+      setTimeout(() => {
+        // Force refresh the page to ensure all components get the new currency
+        window.location.reload();
+        
+        toast({
+          title: "Currency updated",
+          description: "Your currency preference has been saved.",
+        });
+        setIsEditing(false);
+      }, 200);
     },
     onError: (error) => {
       console.error("Error updating currency:", error);

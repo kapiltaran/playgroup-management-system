@@ -1341,6 +1341,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const insertData = insertSettingsSchema.parse(req.body);
       const setting = await storage.createOrUpdateSetting(insertData);
+      
+      // Add activity log for tracking settings changes
+      await storage.createActivity({
+        type: 'settings',
+        action: 'update',
+        details: { 
+          key: setting.key, 
+          value: setting.value,
+          oldValue: req.body.oldValue || 'unknown'
+        }
+      });
+      
       res.status(201).json(setting);
     } catch (error) {
       handleZodError(error, res);
