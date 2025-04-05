@@ -62,24 +62,29 @@ export default function FeeManagement() {
     queryKey: ["/api/academic-years/current"],
   });
   
-  // Set the selected academic year when current academic year loads
-  useEffect(() => {
-    if (currentAcademicYear && !selectedAcademicYearId) {
-      setSelectedAcademicYearId(currentAcademicYear.id);
-    }
-  }, [currentAcademicYear, selectedAcademicYearId]);
-
   // Fetch classes for dropdown, filtered by selected academic year
   const { data: allClasses } = useQuery<Class[]>({
     queryKey: ["/api/classes"],
   });
   
-  // Filter classes by selected academic year
+  // We want to show all classes regardless of academic year
   const classes = useMemo(() => {
-    if (!allClasses) return [];
-    if (!selectedAcademicYearId) return allClasses;
-    return allClasses.filter(c => c.academicYearId === selectedAcademicYearId);
-  }, [allClasses, selectedAcademicYearId]);
+    return allClasses || [];
+  }, [allClasses]);
+
+  // Set the selected academic year when current academic year loads
+  // Also select the first class when data is available
+  useEffect(() => {
+    // Set default academic year
+    if (currentAcademicYear && !selectedAcademicYearId) {
+      setSelectedAcademicYearId(currentAcademicYear.id);
+    }
+    
+    // Select first class if none is selected but we have classes available
+    if (classes?.length > 0 && !selectedFilterClassId) {
+      setSelectedFilterClassId(classes[0].id);
+    }
+  }, [currentAcademicYear, selectedAcademicYearId, classes, selectedFilterClassId]);
   
   // Fetch fee structures
   const { data: feeStructures, isLoading: isLoadingStructures } = useQuery<FeeStructure[]>({
@@ -454,7 +459,7 @@ export default function FeeManagement() {
   };
 
   // Handle installment form submission
-  const handleInstallmentSubmit = (e: React.FormEventEvent) => {
+  const handleInstallmentSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
     // Validate the form data
@@ -577,7 +582,7 @@ export default function FeeManagement() {
                         disabled={!selectedAcademicYearId}
                       >
                         <SelectTrigger id="classFilter" className="w-full">
-                          <SelectValue placeholder="Select Class" />
+                          <SelectValue placeholder="Class" />
                         </SelectTrigger>
                         <SelectContent>
                           {classes?.map((classItem) => (
@@ -904,7 +909,7 @@ export default function FeeManagement() {
                   }}
                 >
                   <SelectTrigger id="classId">
-                    <SelectValue placeholder="Select a class" />
+                    <SelectValue placeholder="Class" />
                   </SelectTrigger>
                   <SelectContent>
                     {classes?.map((classItem) => (
@@ -1002,7 +1007,7 @@ export default function FeeManagement() {
                   }}
                 >
                   <SelectTrigger id="feeStructureId">
-                    <SelectValue placeholder="Select fee structure" />
+                    <SelectValue placeholder="Fee Structure" />
                   </SelectTrigger>
                   <SelectContent>
                     {feeStructures?.map((structure) => (
