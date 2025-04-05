@@ -244,6 +244,28 @@ export default function LinkClasses() {
     }
   }, [currentAcademicYear]);
 
+  // Set default class when academic year is selected and classes are loaded
+  useEffect(() => {
+    if (filteredAcademicYearId && classes?.length && !filteredClassId) {
+      // Find the first class for the selected academic year
+      const firstClass = classes.find(c => c.academicYearId === filteredAcademicYearId);
+      if (firstClass) {
+        setFilteredClassId(firstClass.id);
+      }
+    }
+  }, [filteredAcademicYearId, classes, filteredClassId]);
+
+  // Set default batch when class is selected and batches are loaded
+  useEffect(() => {
+    if (filteredClassId && batches?.length && !filteredBatchId) {
+      // Find the first batch for the selected class
+      const firstBatch = batches.find(b => b.classId === filteredClassId);
+      if (firstBatch) {
+        setFilteredBatchId(firstBatch.id);
+      }
+    }
+  }, [filteredClassId, batches, filteredBatchId]);
+
   // Handle form submission for adding students
   const onSubmit = (data: z.infer<typeof addStudentsSchema>) => {
     if (filteredBatchId) {
