@@ -335,9 +335,9 @@ export default function Batches() {
             <div>
               <Label htmlFor="academicYearFilter">Academic Year</Label>
               <Select
-                value={filteredAcademicYearId?.toString() || ""}
+                value={filteredAcademicYearId?.toString() || "all"}
                 onValueChange={(value) => {
-                  setFilteredAcademicYearId(value ? parseInt(value) : null);
+                  setFilteredAcademicYearId(value === "all" ? null : parseInt(value));
                   setFilteredClassId(null); // Reset class filter when academic year changes
                 }}
               >
@@ -345,7 +345,7 @@ export default function Batches() {
                   <SelectValue placeholder="All Academic Years" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All Academic Years</SelectItem>
+                  <SelectItem value="all">All Academic Years</SelectItem>
                   {academicYears?.map((year) => (
                     <SelectItem key={year.id} value={year.id.toString()}>
                       {year.name} {year.isCurrent && "(Current)"}
@@ -357,15 +357,15 @@ export default function Batches() {
             <div>
               <Label htmlFor="classFilter">Class</Label>
               <Select
-                value={filteredClassId?.toString() || ""}
-                onValueChange={(value) => setFilteredClassId(value ? parseInt(value) : null)}
+                value={filteredClassId?.toString() || "all"}
+                onValueChange={(value) => setFilteredClassId(value === "all" ? null : parseInt(value))}
                 disabled={filteredClasses.length === 0}
               >
                 <SelectTrigger id="classFilter">
                   <SelectValue placeholder="All Classes" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All Classes</SelectItem>
+                  <SelectItem value="all">All Classes</SelectItem>
                   {filteredClasses.map((classItem) => (
                     <SelectItem key={classItem.id} value={classItem.id.toString()}>
                       {classItem.name}
@@ -553,7 +553,7 @@ export default function Batches() {
                         </FormControl>
                         <SelectContent>
                           {availableClasses.length === 0 ? (
-                            <SelectItem value="" disabled>
+                            <SelectItem value="none" disabled>
                               No classes for selected academic year
                             </SelectItem>
                           ) : (
