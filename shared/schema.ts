@@ -25,6 +25,8 @@ export const classes = pgTable("classes", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
   description: text("description"),
+  ageGroup: text("age_group"),
+  capacity: integer("capacity"),
   academicYearId: integer("academic_year_id").notNull().references(() => academicYears.id),
   createdAt: timestamp("created_at").defaultNow(),
 });
