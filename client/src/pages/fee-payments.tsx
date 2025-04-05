@@ -14,6 +14,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
+import { useCurrency } from "@/hooks/use-currency";
 import type { Student, FeeInstallment, FeePayment, Reminder } from "@shared/schema";
 
 // Define payment methods
@@ -29,6 +30,7 @@ const PAYMENT_METHODS = [
 
 export default function FeePayments() {
   const { toast } = useToast();
+  const { currencySymbol, formatCurrency } = useCurrency();
   const [activeTab, setActiveTab] = useState("payments");
   
   // Payment state
@@ -422,9 +424,9 @@ export default function FeePayments() {
         
         let defaultMessage = "";
         if (selectedFee.status === "overdue") {
-          defaultMessage = `Dear ${studentName}'s Parents,\n\nThis is a friendly reminder that your ${installmentName} payment of $${dueAmount} was due on ${dueDate} and is currently overdue. Please make the payment as soon as possible.\n\nThank you.`;
+          defaultMessage = `Dear ${studentName}'s Parents,\n\nThis is a friendly reminder that your ${installmentName} payment of ${currencySymbol}${dueAmount} was due on ${dueDate} and is currently overdue. Please make the payment as soon as possible.\n\nThank you.`;
         } else {
-          defaultMessage = `Dear ${studentName}'s Parents,\n\nThis is a friendly reminder that your ${installmentName} payment of $${dueAmount} is due on ${dueDate}. Please ensure timely payment to avoid any late fees.\n\nThank you.`;
+          defaultMessage = `Dear ${studentName}'s Parents,\n\nThis is a friendly reminder that your ${installmentName} payment of ${currencySymbol}${dueAmount} is due on ${dueDate}. Please ensure timely payment to avoid any late fees.\n\nThank you.`;
         }
         
         setReminderFormData(prev => ({
@@ -533,7 +535,7 @@ export default function FeePayments() {
                   accessorKey: "totalAmount",
                   header: "Total Amount",
                   cell: (item) => (
-                    <div className="text-sm text-gray-900">${parseFloat(item.totalAmount).toFixed(2)}</div>
+                    <div className="text-sm text-gray-900">{formatCurrency(parseFloat(item.totalAmount))}</div>
                   )
                 },
                 {
@@ -547,7 +549,7 @@ export default function FeePayments() {
                   accessorKey: "dueAmount",
                   header: "Due Amount",
                   cell: (item) => (
-                    <div className="text-sm font-medium text-red-600">${parseFloat(item.dueAmount).toFixed(2)}</div>
+                    <div className="text-sm font-medium text-red-600">{formatCurrency(parseFloat(item.dueAmount))}</div>
                   )
                 },
                 {
@@ -654,7 +656,7 @@ export default function FeePayments() {
                   accessorKey: "amount",
                   header: "Amount",
                   cell: (item) => (
-                    <div className="text-sm text-gray-900">${parseFloat(item.amount).toFixed(2)}</div>
+                    <div className="text-sm text-gray-900">{formatCurrency(parseFloat(item.amount))}</div>
                   )
                 },
                 {
@@ -846,7 +848,7 @@ export default function FeePayments() {
                   <SelectContent>
                     {installments?.map((installment) => (
                       <SelectItem key={installment.id} value={installment.id.toString()}>
-                        {getInstallmentName(installment.id)} - ${parseFloat(installment.amount).toFixed(2)}
+                        {getInstallmentName(installment.id)} - {formatCurrency(parseFloat(installment.amount))}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -869,7 +871,7 @@ export default function FeePayments() {
                 <div className="space-y-2">
                   <Label htmlFor="amount">Amount</Label>
                   <div className="relative">
-                    <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-500">$</span>
+                    <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-500">{currencySymbol}</span>
                     <Input
                       id="amount"
                       name="amount"
@@ -1019,7 +1021,7 @@ export default function FeePayments() {
                         value={fee.installmentId.toString()}
                         disabled={fee.studentId !== reminderFormData.studentId}
                       >
-                        {fee.installmentName} - ${parseFloat(fee.dueAmount).toFixed(2)} ({fee.status})
+                        {fee.installmentName} - {formatCurrency(parseFloat(fee.dueAmount))} ({fee.status})
                       </SelectItem>
                     ))}
                   </SelectContent>

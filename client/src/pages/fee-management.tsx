@@ -12,10 +12,12 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
+import { useCurrency } from "@/hooks/use-currency";
 import type { FeeStructure, Class, AcademicYear } from "@shared/schema";
 
 export default function FeeManagement() {
   const { toast } = useToast();
+  const { currencySymbol, formatCurrency } = useCurrency();
   
   // Fee Structure state
   const [isStructureFormOpen, setIsStructureFormOpen] = useState(false);
@@ -418,7 +420,7 @@ export default function FeeManagement() {
                       accessorKey: "totalAmount",
                       header: "Total Amount",
                       cell: (item) => (
-                        <div className="text-sm text-gray-900">${parseFloat(item.totalAmount).toFixed(2)}</div>
+                        <div className="text-sm text-gray-900">{formatCurrency(parseFloat(item.totalAmount))}</div>
                       )
                     },
                     {
@@ -535,7 +537,7 @@ export default function FeeManagement() {
               <div className="space-y-2">
                 <Label htmlFor="totalAmount">Total Amount</Label>
                 <div className="relative">
-                  <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-500">$</span>
+                  <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-500">{currencySymbol}</span>
                   <Input
                     id="totalAmount"
                     name="totalAmount"
