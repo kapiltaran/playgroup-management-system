@@ -28,7 +28,9 @@ import {
   type Attendance,
   type InsertAttendance,
   type AcademicYear,
-  type InsertAcademicYear
+  type InsertAcademicYear,
+  type Batch,
+  type InsertBatch
 } from "@shared/schema";
 
 // Storage interface
@@ -170,6 +172,16 @@ export interface IStorage {
   deleteAcademicYear(id: number): Promise<boolean>;
   updateAllAcademicYearsToNotCurrent(): Promise<void>;
   checkAcademicYearReferences(id: number): Promise<boolean>;
+  
+  // Batch methods
+  getAllBatches(): Promise<Batch[]>;
+  getBatch(id: number): Promise<Batch | undefined>;
+  getBatchesByClass(classId: number): Promise<Batch[]>;
+  getBatchesByAcademicYear(academicYearId: number): Promise<Batch[]>;
+  createBatch(batch: InsertBatch): Promise<Batch>;
+  updateBatch(id: number, batch: Partial<InsertBatch>): Promise<Batch | undefined>;
+  deleteBatch(id: number): Promise<boolean>;
+  getStudentsByBatch(batchId: number): Promise<Student[]>;
 }
 
 export class MemStorage implements IStorage {
@@ -188,6 +200,7 @@ export class MemStorage implements IStorage {
   private teacherClasses: Map<string, TeacherClass>; // Key: teacherId-classId
   private attendance: Map<number, Attendance>;
   private academicYears: Map<number, AcademicYear>;
+  private batches: Map<number, Batch>;
   
   private studentId: number;
   private expenseId: number;
@@ -203,6 +216,7 @@ export class MemStorage implements IStorage {
   private rolePermissionId: number;
   private attendanceId: number;
   private academicYearId: number;
+  private batchId: number;
 
   constructor() {
     this.students = new Map();
@@ -220,6 +234,7 @@ export class MemStorage implements IStorage {
     this.teacherClasses = new Map();
     this.attendance = new Map();
     this.academicYears = new Map();
+    this.batches = new Map();
     
     this.studentId = 1;
     this.expenseId = 1;
@@ -235,6 +250,7 @@ export class MemStorage implements IStorage {
     this.rolePermissionId = 1;
     this.attendanceId = 1;
     this.academicYearId = 1;
+    this.batchId = 1;
     
     // Initialize with sample data asynchronously
     setTimeout(() => {
@@ -613,6 +629,7 @@ export class MemStorage implements IStorage {
       country: insertStudent.country || null,
       status: insertStudent.status || "active",
       classId: insertStudent.classId || null,
+      batchId: insertStudent.batchId || null,
       feeStructureId: insertStudent.feeStructureId || null,
       notes: insertStudent.notes || null,
       createdAt: now
@@ -633,7 +650,14 @@ export class MemStorage implements IStorage {
     const student = this.students.get(id);
     if (!student) return undefined;
     
-    const updatedStudent = { ...student, ...studentData };
+    // Make sure to properly handle the batchId field, it can be null or a number
+    const updatedData = {
+      ...studentData,
+      // Explicitly preserve the batchId if it's not in studentData
+      batchId: studentData.batchId !== undefined ? studentData.batchId : student.batchId
+    };
+    
+    const updatedStudent = { ...student, ...updatedData };
     this.students.set(id, updatedStudent);
     
     // Log activity
@@ -2551,6 +2575,14 @@ export class MemStorage implements IStorage {
       return true;
     }
     
+    // Check if any batches reference this academic year
+    const batchesWithAcademicYear = Array.from(this.batches.values())
+      .filter(batch => batch.academicYearId === id);
+    
+    if (batchesWithAcademicYear.length > 0) {
+      return true;
+    }
+    
     return false;
   }
 
@@ -2576,6 +2608,120 @@ export class MemStorage implements IStorage {
     }
     
     return success;
+  }
+  
+  // Batch methods
+  async getAllBatches(): Promise<Batch[]> {
+    return Array.from(this.batches.values()).sort((a, b) => b.id - a.id);
+  }
+  
+  async getBatch(id: number): Promise<Batch | undefined> {
+    return this.batches.get(id);
+  }
+  
+  async getBatchesByClass(classId: number): Promise<Batch[]> {
+    return Array.from(this.batches.values())
+      .filter(batch => batch.classId === classId)
+      .sort((a, b) => b.id - a.id);
+  }
+  
+  async getBatchesByAcademicYear(academicYearId: number): Promise<Batch[]> {
+    return Array.from(this.batches.values())
+      .filter(batch => batch.academicYearId === academicYearId)
+      .sort((a, b) => b.id - a.id);
+  }
+  
+  async createBatch(batch: InsertBatch): Promise<Batch> {
+    const id = this.batchId++;
+    const now = new Date();
+    // Use 20 as default capacity if not specified (matching schema default)
+    const capacity = typeof batch.capacity === 'number' ? batch.capacity : 20;
+    
+    const newBatch: Batch = { 
+      id, 
+      name: batch.name,
+      academicYearId: batch.academicYearId,
+      classId: batch.classId,
+      capacity: capacity,
+      createdAt: now,
+      updatedAt: now
+    };
+    this.batches.set(id, newBatch);
+    
+    // Log activity
+    this.createActivity({
+      type: 'batch',
+      action: 'create',
+      details: { batchId: id, name: newBatch.name }
+    });
+    
+    return newBatch;
+  }
+  
+  async updateBatch(id: number, batchData: Partial<InsertBatch>): Promise<Batch | undefined> {
+    const batch = this.batches.get(id);
+    if (!batch) return undefined;
+    
+    const now = new Date();
+    
+    // Apply capacity update if specified, otherwise keep the current value
+    const capacity = typeof batchData.capacity === 'number' ? batchData.capacity : batch.capacity;
+    
+    const updatedData = {
+      name: batchData.name || batch.name,
+      academicYearId: batchData.academicYearId || batch.academicYearId,
+      classId: batchData.classId || batch.classId,
+      capacity: capacity,
+    };
+    
+    const updatedBatch = { 
+      ...batch,
+      ...updatedData,
+      updatedAt: now 
+    };
+    
+    this.batches.set(id, updatedBatch);
+    
+    // Log activity
+    this.createActivity({
+      type: 'batch',
+      action: 'update',
+      details: { batchId: id, name: updatedBatch.name }
+    });
+    
+    return updatedBatch;
+  }
+  
+  async deleteBatch(id: number): Promise<boolean> {
+    const batch = this.batches.get(id);
+    if (!batch) return false;
+    
+    // Check if any students are assigned to this batch
+    const studentsInBatch = Array.from(this.students.values())
+      .filter(student => student.batchId === id);
+    
+    if (studentsInBatch.length > 0) {
+      return false; // Cannot delete batch with students assigned
+    }
+    
+    const success = this.batches.delete(id);
+    
+    if (success) {
+      // Log activity
+      this.createActivity({
+        type: 'batch',
+        action: 'delete',
+        details: { batchId: id, name: batch.name }
+      });
+    }
+    
+    return success;
+  }
+  
+  async getStudentsByBatch(batchId: number): Promise<Student[]> {
+    return Array.from(this.students.values())
+      .filter(student => student.batchId === batchId)
+      .sort((a, b) => b.id - a.id);
   }
 }
 

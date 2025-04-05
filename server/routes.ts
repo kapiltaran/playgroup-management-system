@@ -15,6 +15,7 @@ import {
   insertUserSchema,
   insertAttendanceSchema,
   insertAcademicYearSchema,
+  insertBatchSchema,
   roleEnum
 } from "@shared/schema";
 import { ZodError } from "zod";
@@ -2258,6 +2259,271 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error generating attendance report:", error);
       res.status(500).json({ message: "Failed to generate attendance report" });
+    }
+  });
+
+  // Batch Management Routes
+  app.get("/api/batches", async (req: Request, res: Response) => {
+    try {
+      const user = (req.session as any).user;
+      if (!user) {
+        return res.status(401).json({ message: "Authentication required" });
+      }
+      
+      // Check if user has permission to view batches
+      const canView = await storage.checkPermission(user.role, 'batch_management', 'view');
+      if (!canView) {
+        return res.status(403).json({ message: "You don't have permission to view batches" });
+      }
+      
+      const batches = await storage.getAllBatches();
+      res.json(batches);
+    } catch (error) {
+      console.error("Error fetching batches:", error);
+      res.status(500).json({ message: "Failed to fetch batches" });
+    }
+  });
+  
+  app.get("/api/batches/:id", async (req: Request, res: Response) => {
+    try {
+      const user = (req.session as any).user;
+      if (!user) {
+        return res.status(401).json({ message: "Authentication required" });
+      }
+      
+      // Check if user has permission to view batches
+      const canView = await storage.checkPermission(user.role, 'batch_management', 'view');
+      if (!canView) {
+        return res.status(403).json({ message: "You don't have permission to view batches" });
+      }
+      
+      const batchId = parseInt(req.params.id);
+      
+      if (isNaN(batchId)) {
+        return res.status(400).json({ message: "Invalid batch ID" });
+      }
+      
+      const batch = await storage.getBatch(batchId);
+      
+      if (!batch) {
+        return res.status(404).json({ message: "Batch not found" });
+      }
+      
+      res.json(batch);
+    } catch (error) {
+      console.error("Error fetching batch:", error);
+      res.status(500).json({ message: "Failed to fetch batch" });
+    }
+  });
+  
+  app.post("/api/batches", async (req: Request, res: Response) => {
+    try {
+      const user = (req.session as any).user;
+      if (!user) {
+        return res.status(401).json({ message: "Authentication required" });
+      }
+      
+      // Check if user has permission to create batches
+      const canCreate = await storage.checkPermission(user.role, 'batch_management', 'create');
+      if (!canCreate) {
+        return res.status(403).json({ message: "You don't have permission to create batches" });
+      }
+      
+      const result = insertBatchSchema.safeParse(req.body);
+      
+      if (!result.success) {
+        return handleZodError(result.error, res);
+      }
+      
+      const batch = await storage.createBatch(result.data);
+      
+      // Create activity log entry
+      await storage.createActivity({
+        type: 'batch',
+        action: 'create',
+        details: { batchId: batch.id, name: batch.name }
+      });
+      
+      res.status(201).json(batch);
+    } catch (error) {
+      console.error("Error creating batch:", error);
+      res.status(500).json({ message: "Failed to create batch" });
+    }
+  });
+  
+  app.patch("/api/batches/:id", async (req: Request, res: Response) => {
+    try {
+      const user = (req.session as any).user;
+      if (!user) {
+        return res.status(401).json({ message: "Authentication required" });
+      }
+      
+      // Check if user has permission to edit batches
+      const canEdit = await storage.checkPermission(user.role, 'batch_management', 'edit');
+      if (!canEdit) {
+        return res.status(403).json({ message: "You don't have permission to edit batches" });
+      }
+      
+      const batchId = parseInt(req.params.id);
+      
+      if (isNaN(batchId)) {
+        return res.status(400).json({ message: "Invalid batch ID" });
+      }
+      
+      const result = insertBatchSchema.partial().safeParse(req.body);
+      
+      if (!result.success) {
+        return handleZodError(result.error, res);
+      }
+      
+      const updatedBatch = await storage.updateBatch(batchId, result.data);
+      
+      if (!updatedBatch) {
+        return res.status(404).json({ message: "Batch not found" });
+      }
+      
+      // Create activity log entry
+      await storage.createActivity({
+        type: 'batch',
+        action: 'update',
+        details: { batchId: updatedBatch.id, name: updatedBatch.name }
+      });
+      
+      res.json(updatedBatch);
+    } catch (error) {
+      console.error("Error updating batch:", error);
+      res.status(500).json({ message: "Failed to update batch" });
+    }
+  });
+  
+  app.delete("/api/batches/:id", async (req: Request, res: Response) => {
+    try {
+      const user = (req.session as any).user;
+      if (!user) {
+        return res.status(401).json({ message: "Authentication required" });
+      }
+      
+      // Check if user has permission to delete batches
+      const canDelete = await storage.checkPermission(user.role, 'batch_management', 'delete');
+      if (!canDelete) {
+        return res.status(403).json({ message: "You don't have permission to delete batches" });
+      }
+      
+      const batchId = parseInt(req.params.id);
+      
+      if (isNaN(batchId)) {
+        return res.status(400).json({ message: "Invalid batch ID" });
+      }
+      
+      const batch = await storage.getBatch(batchId);
+      
+      if (!batch) {
+        return res.status(404).json({ message: "Batch not found" });
+      }
+      
+      // Check if there are students assigned to this batch
+      const studentsInBatch = await storage.getStudentsByBatch(batchId);
+      
+      if (studentsInBatch.length > 0) {
+        return res.status(400).json({ 
+          message: "Cannot delete batch with students assigned. Reassign students first." 
+        });
+      }
+      
+      await storage.deleteBatch(batchId);
+      
+      // Create activity log entry
+      await storage.createActivity({
+        type: 'batch',
+        action: 'delete',
+        details: { batchId, name: batch.name }
+      });
+      
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting batch:", error);
+      res.status(500).json({ message: "Failed to delete batch" });
+    }
+  });
+  
+  app.get("/api/batches/class/:classId", async (req: Request, res: Response) => {
+    try {
+      const user = (req.session as any).user;
+      if (!user) {
+        return res.status(401).json({ message: "Authentication required" });
+      }
+      
+      // Check if user has permission to view batches
+      const canView = await storage.checkPermission(user.role, 'batch_management', 'view');
+      if (!canView) {
+        return res.status(403).json({ message: "You don't have permission to view batches" });
+      }
+      
+      const classId = parseInt(req.params.classId);
+      
+      if (isNaN(classId)) {
+        return res.status(400).json({ message: "Invalid class ID" });
+      }
+      
+      const batches = await storage.getBatchesByClass(classId);
+      res.json(batches);
+    } catch (error) {
+      console.error("Error fetching batches by class:", error);
+      res.status(500).json({ message: "Failed to fetch batches by class" });
+    }
+  });
+  
+  app.get("/api/batches/academic-year/:academicYearId", async (req: Request, res: Response) => {
+    try {
+      const user = (req.session as any).user;
+      if (!user) {
+        return res.status(401).json({ message: "Authentication required" });
+      }
+      
+      // Check if user has permission to view batches
+      const canView = await storage.checkPermission(user.role, 'batch_management', 'view');
+      if (!canView) {
+        return res.status(403).json({ message: "You don't have permission to view batches" });
+      }
+      
+      const academicYearId = parseInt(req.params.academicYearId);
+      
+      if (isNaN(academicYearId)) {
+        return res.status(400).json({ message: "Invalid academic year ID" });
+      }
+      
+      const batches = await storage.getBatchesByAcademicYear(academicYearId);
+      res.json(batches);
+    } catch (error) {
+      console.error("Error fetching batches by academic year:", error);
+      res.status(500).json({ message: "Failed to fetch batches by academic year" });
+    }
+  });
+  
+  app.get("/api/students/batch/:batchId", async (req: Request, res: Response) => {
+    try {
+      const user = (req.session as any).user;
+      if (!user) {
+        return res.status(401).json({ message: "Authentication required" });
+      }
+      
+      // Check if user has permission to view students
+      const canViewStudents = await storage.checkPermission(user.role, 'students', 'view');
+      if (!canViewStudents) {
+        return res.status(403).json({ message: "You don't have permission to view students" });
+      }
+      
+      const batchId = parseInt(req.params.batchId);
+      
+      if (isNaN(batchId)) {
+        return res.status(400).json({ message: "Invalid batch ID" });
+      }
+      
+      const students = await storage.getStudentsByBatch(batchId);
+      res.json(students);
+    } catch (error) {
+      console.error("Error fetching students by batch:", error);
+      res.status(500).json({ message: "Failed to fetch students by batch" });
     }
   });
 

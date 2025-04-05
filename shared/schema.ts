@@ -17,8 +17,26 @@ export const moduleEnum = pgEnum('module', [
   'user_management',
   'role_management',
   'attendance',
-  'academic_year'
+  'academic_year',
+  'batch_management'
 ]);
+
+// Academic Year schema
+export const academicYears = pgTable("academic_years", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull().unique(), // e.g., "2024-2025"
+  startDate: date("start_date").notNull(),
+  endDate: date("end_date").notNull(),
+  isCurrent: boolean("is_current").notNull().default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertAcademicYearSchema = createInsertSchema(academicYears).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
 
 // Class schema
 export const classes = pgTable("classes", {
@@ -34,6 +52,23 @@ export const classes = pgTable("classes", {
 export const insertClassSchema = createInsertSchema(classes).omit({
   id: true,
   createdAt: true,
+});
+
+// Batch schema
+export const batches = pgTable("batches", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  academicYearId: integer("academic_year_id").notNull().references(() => academicYears.id),
+  classId: integer("class_id").notNull().references(() => classes.id),
+  capacity: integer("capacity").notNull().default(20),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertBatchSchema = createInsertSchema(batches).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
 });
 
 // Fee structure schema
@@ -85,6 +120,7 @@ export const students = pgTable("students", {
   country: text("country"),
   status: text("status").notNull().default("active"),
   classId: integer("class_id").references(() => classes.id),
+  batchId: integer("batch_id").references(() => batches.id),
   feeStructureId: integer("fee_structure_id").references(() => feeStructures.id),
   notes: text("notes"),
   createdAt: timestamp("created_at").defaultNow(),
@@ -266,23 +302,6 @@ export const insertTeacherClassSchema = createInsertSchema(teacherClasses).omit(
   assignedDate: true,
 });
 
-// Academic Year schema
-export const academicYears = pgTable("academic_years", {
-  id: serial("id").primaryKey(),
-  name: text("name").notNull().unique(), // e.g., "2024-2025"
-  startDate: date("start_date").notNull(),
-  endDate: date("end_date").notNull(),
-  isCurrent: boolean("is_current").notNull().default(false),
-  createdAt: timestamp("created_at").defaultNow(),
-  updatedAt: timestamp("updated_at").defaultNow(),
-});
-
-export const insertAcademicYearSchema = createInsertSchema(academicYears).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-});
-
 // Attendance schema
 export const attendance = pgTable("attendance", {
   id: serial("id").primaryKey(),
@@ -333,3 +352,5 @@ export type RolePermission = typeof rolePermissions.$inferSelect;
 export type InsertRolePermission = z.infer<typeof insertRolePermissionSchema>;
 export type AcademicYear = typeof academicYears.$inferSelect;
 export type InsertAcademicYear = z.infer<typeof insertAcademicYearSchema>;
+export type Batch = typeof batches.$inferSelect;
+export type InsertBatch = z.infer<typeof insertBatchSchema>;
