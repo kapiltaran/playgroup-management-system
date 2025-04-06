@@ -1021,6 +1021,7 @@ export class MemStorage implements IStorage {
     // Get fee structures and payments for students
     const result = [];
     
+    // First, add fee structures assigned to students
     for (const student of students) {
       // Skip if student has no fee structure assigned
       if (!student.feeStructureId) continue;
@@ -1059,6 +1060,38 @@ export class MemStorage implements IStorage {
           status: feeStructure.dueDate && new Date(feeStructure.dueDate) < new Date() ? 'overdue' : 'upcoming'
         });
       }
+    }
+    
+    // Now, add any fee structures that aren't assigned to students yet
+    // This will include newly created fee structures
+    const allFeeStructureIds = new Set(result.map(item => item.feeStructureId));
+    
+    for (const feeStructure of this.feeStructures.values()) {
+      // Skip if this fee structure is already included
+      if (allFeeStructureIds.has(feeStructure.id)) continue;
+      
+      // Skip if class filter is active and this fee structure doesn't match
+      if (classId && feeStructure.classId !== classId) continue;
+      
+      // Get the class for this fee structure
+      const classObj = feeStructure.classId ? this.classes.get(feeStructure.classId) : null;
+      
+      // Calculate due amount (for new fee structures, there are no payments yet)
+      const dueAmount = parseFloat(feeStructure.totalAmount.toString());
+      
+      result.push({
+        studentId: null, // No student assigned yet
+        studentName: "Unassigned", // Placeholder for unassigned fee structures
+        classId: feeStructure.classId,
+        className: classObj ? classObj.name : 'Not Assigned',
+        feeStructureId: feeStructure.id,
+        feeName: feeStructure.name,
+        dueDate: feeStructure.dueDate,
+        totalAmount: feeStructure.totalAmount,
+        paidAmount: 0, // No payments yet
+        dueAmount,
+        status: feeStructure.dueDate && new Date(feeStructure.dueDate) < new Date() ? 'overdue' : 'upcoming'
+      });
     }
     
     // Sort by due date, with overdue first

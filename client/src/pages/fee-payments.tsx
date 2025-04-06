@@ -44,7 +44,8 @@ export default function FeePayments() {
     amount: "",
     paymentMethod: "Cash",
     receiptNumber: "",
-    notes: ""
+    notes: "",
+    isUnassignedFeeStructure: false
   });
 
   // Reminder state
@@ -247,7 +248,8 @@ export default function FeePayments() {
       amount: "",
       paymentMethod: "Cash",
       receiptNumber: "",
-      notes: ""
+      notes: "",
+      isUnassignedFeeStructure: false
     });
     setCurrentPayment(null);
   };
@@ -274,7 +276,8 @@ export default function FeePayments() {
       amount: payment.amount,
       paymentMethod: payment.paymentMethod,
       receiptNumber: payment.receiptNumber || "",
-      notes: payment.notes || ""
+      notes: payment.notes || "",
+      isUnassignedFeeStructure: payment.studentId === 0 // If studentId is 0, it's an unassigned payment
     });
     setIsPaymentFormOpen(true);
   };
@@ -290,6 +293,18 @@ export default function FeePayments() {
   const handlePaymentSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
+    // Validate student selection for non-unassigned fee structures
+    if (!paymentFormData.isUnassignedFeeStructure && paymentFormData.studentId === 0) {
+      toast({
+        title: "Error",
+        description: "Please select a student for this payment",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    // For unassigned fee structures, we'll set studentId to 0 as a marker
+    // The backend will interpret this as an unassigned payment
     const formDataToSubmit = {
       ...paymentFormData,
       amount: paymentFormData.amount.toString()
@@ -806,38 +821,26 @@ export default function FeePayments() {
           <form onSubmit={handlePaymentSubmit} className="space-y-4">
             <div className="grid grid-cols-1 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="studentId">Student</Label>
-                <Select 
-                  value={paymentFormData.studentId.toString()} 
-                  onValueChange={(value) => {
-                    setPaymentFormData(prev => ({
-                      ...prev,
-                      studentId: parseInt(value)
-                    }));
-                  }}
-                  disabled={paymentFormMode === "edit"}
-                >
-                  <SelectTrigger id="studentId">
-                    <SelectValue placeholder="Select a student" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {students?.map((student) => (
-                      <SelectItem key={student.id} value={student.id.toString()}>
-                        {student.fullName}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="feeStructureId">Fee Structure</Label>
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="feeStructureId">Fee Structure</Label>
+                </div>
                 <Select 
                   value={paymentFormData.feeStructureId.toString()} 
                   onValueChange={(value) => {
+                    const feeStructureId = parseInt(value);
+                    const selectedFeeStructure = pendingFees?.find(fee => fee.feeStructureId === feeStructureId);
+                    
+                    // Check if this is an unassigned fee structure
+                    const isUnassigned = selectedFeeStructure?.studentId === null;
+                    
                     setPaymentFormData(prev => ({
                       ...prev,
-                      feeStructureId: parseInt(value)
+                      feeStructureId: feeStructureId,
+                      isUnassignedFeeStructure: isUnassigned || false,
+                      // If the fee structure is unassigned, reset studentId
+                      studentId: isUnassigned ? 0 : (selectedFeeStructure?.studentId || prev.studentId),
+                      // Set the amount to the due amount if available
+                      amount: selectedFeeStructure?.dueAmount.toString() || prev.amount
                     }));
                   }}
                   disabled={paymentFormMode === "edit"}
@@ -846,14 +849,46 @@ export default function FeePayments() {
                     <SelectValue placeholder="Select a fee structure" />
                   </SelectTrigger>
                   <SelectContent>
-                    {feeStructures?.map((feeStructure) => (
-                      <SelectItem key={feeStructure.id} value={feeStructure.id.toString()}>
-                        {feeStructure.name} - {formatCurrency(parseFloat(feeStructure.totalAmount))}
+                    {pendingFees?.map((fee) => (
+                      <SelectItem 
+                        key={`${fee.feeStructureId}-${fee.studentId || 'unassigned'}`} 
+                        value={fee.feeStructureId.toString()}
+                      >
+                        {fee.feeName} - {formatCurrency(parseFloat(fee.dueAmount))}
+                        {fee.studentId === null && " (Unassigned)"}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
+
+              {/* Show student selection only if the fee structure is not unassigned */}
+              {!paymentFormData.isUnassignedFeeStructure && (
+                <div className="space-y-2">
+                  <Label htmlFor="studentId">Student</Label>
+                  <Select 
+                    value={paymentFormData.studentId.toString()} 
+                    onValueChange={(value) => {
+                      setPaymentFormData(prev => ({
+                        ...prev,
+                        studentId: parseInt(value)
+                      }));
+                    }}
+                    disabled={paymentFormMode === "edit" || paymentFormData.isUnassignedFeeStructure}
+                  >
+                    <SelectTrigger id="studentId">
+                      <SelectValue placeholder="Select a student" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {students?.map((student) => (
+                        <SelectItem key={student.id} value={student.id.toString()}>
+                          {student.fullName}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
