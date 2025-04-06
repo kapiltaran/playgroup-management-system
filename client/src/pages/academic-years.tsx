@@ -340,7 +340,11 @@ export default function AcademicYears() {
                           <Calendar
                             mode="single"
                             selected={field.value}
-                            onSelect={field.onChange}
+                            onSelect={(date) => {
+                              field.onChange(date);
+                              // Force close the popover when a date is selected
+                              document.body.click();
+                            }}
                             initialFocus
                           />
                         </PopoverContent>
@@ -379,7 +383,11 @@ export default function AcademicYears() {
                           <Calendar
                             mode="single"
                             selected={field.value}
-                            onSelect={field.onChange}
+                            onSelect={(date) => {
+                              field.onChange(date);
+                              // Force close the popover when a date is selected
+                              document.body.click();
+                            }}
                             initialFocus
                           />
                         </PopoverContent>
