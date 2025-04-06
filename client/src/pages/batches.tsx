@@ -148,11 +148,8 @@ export default function Batches() {
   // Select first class by default if available
   useEffect(() => {
     if (classes && classes.length > 0 && filteredAcademicYearId && !filteredClassId) {
-      // Filter classes by selected academic year
-      const academicYearClasses = classes.filter(c => c.academicYearId === filteredAcademicYearId);
-      if (academicYearClasses.length > 0) {
-        setFilteredClassId(academicYearClasses[0].id);
-      }
+      // Select the first class regardless of academic year
+      setFilteredClassId(classes[0].id);
     }
   }, [classes, filteredAcademicYearId, filteredClassId]);
 
@@ -295,12 +292,8 @@ export default function Batches() {
     setIsFormOpen(true);
   };
 
-  // Filter classes by selected academic year
-  const filteredClasses = classes
-    ? classes.filter(
-        (c) => !filteredAcademicYearId || c.academicYearId === filteredAcademicYearId
-      )
-    : [];
+  // Show all classes regardless of academic year
+  const filteredClasses = classes ? classes : [];
 
   // Filter batches by selected filters
   const filteredBatches = batches
@@ -556,12 +549,8 @@ export default function Batches() {
                     ? parseInt(form.getValues().academicYearId)
                     : null;
                   
-                  // Filter classes by selected academic year
-                  const availableClasses = classes
-                    ? classes.filter(
-                        (c) => !selectedAcademicYearId || c.academicYearId === selectedAcademicYearId
-                      )
-                    : [];
+                  // Show all classes regardless of academic year
+                  const availableClasses = classes ? classes : [];
 
                   return (
                     <FormItem>
@@ -580,7 +569,7 @@ export default function Batches() {
                         <SelectContent>
                           {availableClasses.length === 0 ? (
                             <SelectItem value="none" disabled>
-                              No classes for selected academic year
+                              No classes available
                             </SelectItem>
                           ) : (
                             availableClasses.map((classItem) => (
