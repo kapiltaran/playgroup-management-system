@@ -24,6 +24,15 @@ export default function FeeManagement() {
   const [structureFormMode, setStructureFormMode] = useState<"add" | "edit" | "clone">("add");
   const [currentStructure, setCurrentStructure] = useState<FeeStructure | null>(null);
   
+  // Clone Dialog state
+  const [isCloneDialogOpen, setIsCloneDialogOpen] = useState(false);
+  const [cloneData, setCloneData] = useState({
+    sourceAcademicYearId: 0,
+    sourceClassId: 0,
+    targetAcademicYearId: 0,
+    targetClassId: 0
+  });
+  
   // Format today's date as YYYY-MM-DD for the date input
   const today = new Date();
   const formattedDate = today.toISOString().split('T')[0];
@@ -169,6 +178,36 @@ export default function FeeManagement() {
       toast({
         title: "Error",
         description: error.message || "Failed to delete fee structure. It may have installments or be assigned to students.",
+        variant: "destructive",
+      });
+    },
+  });
+  
+  // Clone fee structures between classes/academic years mutation
+  const cloneFeeStructuresMutation = useMutation({
+    mutationFn: (data: {
+      sourceAcademicYearId: number;
+      sourceClassId: number;
+      targetAcademicYearId: number;
+      targetClassId: number;
+    }) => 
+      apiRequest("POST", "/api/fee-structures/clone", data),
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/fee-structures"] });
+      toast({
+        title: "Success",
+        description: `Successfully cloned ${data.clonedStructures?.length || 0} fee structures`,
+      });
+      setIsCloneDialogOpen(false);
+      
+      // Set the filters to show the newly cloned fee structures
+      setSelectedAcademicYearId(cloneData.targetAcademicYearId);
+      setSelectedFilterClassId(cloneData.targetClassId);
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to clone fee structures",
         variant: "destructive",
       });
     },
@@ -328,6 +367,9 @@ export default function FeeManagement() {
     <div className="max-w-7xl mx-auto">
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Fee Management</h1>
+        <Button onClick={() => setIsCloneDialogOpen(true)} variant="outline">
+          <CopyIcon className="mr-2 h-4 w-4" /> Clone Fees
+        </Button>
       </div>
 
       <div className="space-y-6">
@@ -630,6 +672,170 @@ export default function FeeManagement() {
                   : structureFormMode === "clone" 
                     ? "Clone Structure" 
                     : "Update Structure"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Clone Fee Structures Dialog */}
+      <Dialog open={isCloneDialogOpen} onOpenChange={setIsCloneDialogOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Clone Fee Structures</DialogTitle>
+            <DialogDescription>
+              Copy all fee structures from one academic year and class to another. This will create new fee structures with the same details.
+            </DialogDescription>
+          </DialogHeader>
+
+          <form 
+            onSubmit={(e) => {
+              e.preventDefault();
+              
+              // Validate selections
+              if (!cloneData.sourceAcademicYearId || !cloneData.sourceClassId || 
+                  !cloneData.targetAcademicYearId || !cloneData.targetClassId) {
+                toast({
+                  title: "Incomplete Selection",
+                  description: "Please select both source and target academic years and classes",
+                  variant: "destructive"
+                });
+                return;
+              }
+              
+              // Check if source and target are the same
+              if (cloneData.sourceAcademicYearId === cloneData.targetAcademicYearId && 
+                  cloneData.sourceClassId === cloneData.targetClassId) {
+                toast({
+                  title: "Invalid Selection",
+                  description: "Source and target cannot be the same",
+                  variant: "destructive"
+                });
+                return;
+              }
+              
+              // Confirm before proceeding
+              if (window.confirm(`Are you sure you want to clone all fee structures from ${getAcademicYearName(cloneData.sourceAcademicYearId)} - ${getClassName(cloneData.sourceClassId)} to ${getAcademicYearName(cloneData.targetAcademicYearId)} - ${getClassName(cloneData.targetClassId)}?`)) {
+                cloneFeeStructuresMutation.mutate(cloneData);
+              }
+            }} 
+            className="space-y-4"
+          >
+            <div className="grid grid-cols-1 gap-6">
+              <div className="space-y-4">
+                <h3 className="text-base font-medium">Source (Copy From)</h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="sourceAcademicYearId">Academic Year</Label>
+                    <Select 
+                      value={cloneData.sourceAcademicYearId?.toString() || ""}
+                      onValueChange={(value) => setCloneData(prev => ({
+                        ...prev,
+                        sourceAcademicYearId: parseInt(value)
+                      }))}
+                    >
+                      <SelectTrigger id="sourceAcademicYearId">
+                        <SelectValue placeholder="Select Academic Year" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {academicYears?.map((year) => (
+                          <SelectItem key={year.id} value={year.id.toString()}>
+                            {year.name} {year.isCurrent && "(Current)"}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="sourceClassId">Class</Label>
+                    <Select 
+                      value={cloneData.sourceClassId?.toString() || ""}
+                      onValueChange={(value) => setCloneData(prev => ({
+                        ...prev,
+                        sourceClassId: parseInt(value)
+                      }))}
+                      disabled={!cloneData.sourceAcademicYearId}
+                    >
+                      <SelectTrigger id="sourceClassId">
+                        <SelectValue placeholder="Select Class" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {classes?.map((classItem) => (
+                          <SelectItem key={classItem.id} value={classItem.id.toString()}>
+                            {classItem.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="space-y-4">
+                <h3 className="text-base font-medium">Target (Copy To)</h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="targetAcademicYearId">Academic Year</Label>
+                    <Select 
+                      value={cloneData.targetAcademicYearId?.toString() || ""}
+                      onValueChange={(value) => setCloneData(prev => ({
+                        ...prev,
+                        targetAcademicYearId: parseInt(value)
+                      }))}
+                    >
+                      <SelectTrigger id="targetAcademicYearId">
+                        <SelectValue placeholder="Select Academic Year" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {academicYears?.map((year) => (
+                          <SelectItem key={year.id} value={year.id.toString()}>
+                            {year.name} {year.isCurrent && "(Current)"}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="targetClassId">Class</Label>
+                    <Select 
+                      value={cloneData.targetClassId?.toString() || ""}
+                      onValueChange={(value) => setCloneData(prev => ({
+                        ...prev,
+                        targetClassId: parseInt(value)
+                      }))}
+                      disabled={!cloneData.targetAcademicYearId}
+                    >
+                      <SelectTrigger id="targetClassId">
+                        <SelectValue placeholder="Select Class" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {classes?.map((classItem) => (
+                          <SelectItem key={classItem.id} value={classItem.id.toString()}>
+                            {classItem.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setIsCloneDialogOpen(false)}
+              >
+                Cancel
+              </Button>
+              <Button 
+                type="submit"
+                disabled={cloneFeeStructuresMutation.isPending}
+              >
+                Clone Fee Structures
               </Button>
             </DialogFooter>
           </form>

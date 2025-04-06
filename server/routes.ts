@@ -773,6 +773,56 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  // API endpoint to clone fee structures from one class/academic year to another
+  app.post("/api/fee-structures/clone", async (req: Request, res: Response) => {
+    try {
+      const { sourceAcademicYearId, sourceClassId, targetAcademicYearId, targetClassId } = req.body;
+      
+      if (!sourceAcademicYearId || !sourceClassId || !targetAcademicYearId || !targetClassId) {
+        return res.status(400).json({ 
+          message: "sourceAcademicYearId, sourceClassId, targetAcademicYearId, and targetClassId are required" 
+        });
+      }
+      
+      // Get fee structures for the source academic year and class
+      const allFeeStructures = await storage.getFeeStructures();
+      const feeStructuresToClone = allFeeStructures.filter(
+        fs => fs.academicYearId === sourceAcademicYearId && fs.classId === sourceClassId
+      );
+      
+      if (feeStructuresToClone.length === 0) {
+        return res.status(404).json({ 
+          message: "No fee structures found for the selected source academic year and class" 
+        });
+      }
+      
+      // Clone each fee structure
+      const clonedStructures = [];
+      for (const structure of feeStructuresToClone) {
+        // Create the new fee structure with updated details
+        const newStructure = {
+          name: structure.name,
+          academicYearId: targetAcademicYearId,
+          classId: targetClassId,
+          totalAmount: structure.totalAmount,
+          description: structure.description,
+          dueDate: structure.dueDate,
+        };
+        
+        const created = await storage.createFeeStructure(newStructure);
+        clonedStructures.push(created);
+      }
+      
+      res.status(201).json({
+        message: `Successfully cloned ${clonedStructures.length} fee structures`,
+        clonedStructures
+      });
+    } catch (error) {
+      console.error("Error cloning fee structures:", error);
+      res.status(500).json({ message: "Failed to clone fee structures" });
+    }
+  });
+  
   // Fee installments API removed as per restructuring
   // Fees are now directly associated with fee structures
   
