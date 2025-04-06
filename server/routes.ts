@@ -2591,6 +2591,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Invalid batch ID" });
       }
       
+      // Get batch details to find academicYearId and classId
+      const batch = await storage.getBatch(batchId);
+      if (!batch) {
+        return res.status(404).json({ message: "Batch not found" });
+      }
+      
+      // Get the fee structures for this class and academic year
+      const allFeeStructures = await storage.getFeeStructures();
+      const matchingFeeStructures = allFeeStructures.filter(
+        fee => fee.classId === batch.classId && fee.academicYearId === batch.academicYearId
+      );
+      
       // Validate body
       if (!req.body.studentIds || !Array.isArray(req.body.studentIds)) {
         return res.status(400).json({ message: "studentIds array is required" });
@@ -2605,9 +2617,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
-      // Link students to batch
+      // Link students to batch and associate fee structure (if available)
       for (const studentId of studentIds) {
+        // First link student to batch
         await storage.updateStudent(studentId, { batchId });
+        
+        // Then associate fee structure if one exists for this class and academic year
+        if (matchingFeeStructures.length > 0) {
+          // Use the first matching fee structure found (most common case)
+          // You could enhance this with a priority or selection mechanism if needed
+          const feeStructureId = matchingFeeStructures[0].id;
+          await storage.updateStudent(studentId, { feeStructureId });
+          
+          // Create activity log for fee structure assignment
+          await storage.createActivity({
+            type: 'fee',
+            action: 'assign',
+            details: { 
+              studentId, 
+              feeStructureId,
+              feeName: matchingFeeStructures[0].name,
+              className: batch.classId,
+              academicYearId: batch.academicYearId
+            }
+          });
+        }
       }
       
       // Create activity logs
@@ -2653,6 +2687,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Remove student from batch by setting batchId to null
       await storage.updateStudent(studentId, { batchId: null });
+      
+      // Remove fee structure association as well
+      if (student.feeStructureId) {
+        // Optional: Check if fee structure is related to this batch before removing
+        const batch = await storage.getBatch(batchId);
+        if (batch) {
+          const feeStructure = await storage.getFeeStructure(student.feeStructureId);
+          if (feeStructure && 
+              feeStructure.classId === batch.classId && 
+              feeStructure.academicYearId === batch.academicYearId) {
+            // Only reset the fee structure if it was associated with this batch's class and academic year
+            await storage.updateStudent(studentId, { feeStructureId: null });
+            
+            // Create activity log for fee structure removal
+            await storage.createActivity({
+              type: 'fee',
+              action: 'unassign',
+              details: { 
+                studentId, 
+                feeStructureId: student.feeStructureId,
+                reason: 'batch-removal'
+              }
+            });
+          }
+        }
+      }
       
       // Create activity log
       await storage.createActivity({
