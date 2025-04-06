@@ -145,15 +145,10 @@ export default function LinkClasses() {
     select: (data) => data as AcademicYear,
   });
 
-  // Query classes based on academic year filter
+  // Query all classes - show all classes regardless of academic year
   const { data: classes, isLoading: isLoadingClasses } = useQuery({
     queryKey: ["/api/classes"],
-    select: (data) => {
-      const allClasses = data as Class[];
-      return filteredAcademicYearId
-        ? allClasses.filter(c => c.academicYearId === filteredAcademicYearId)
-        : allClasses;
-    },
+    select: (data) => data as Class[],
   });
 
   // Query batches based on class filter
@@ -247,14 +242,9 @@ export default function LinkClasses() {
   // Set default class when academic year is selected and classes are loaded
   useEffect(() => {
     if (filteredAcademicYearId && classes?.length) {
-      // Find the first class for the selected academic year
-      const filteredClasses = classes.filter(c => c.academicYearId === filteredAcademicYearId);
-      if (filteredClasses.length > 0) {
-        // If current class is no longer valid for the selected academic year, or no class is selected
-        const isCurrentClassValid = filteredClasses.some(c => c.id === filteredClassId);
-        if (!isCurrentClassValid || !filteredClassId) {
-          setFilteredClassId(filteredClasses[0].id);
-        }
+      // If no class is selected, set the first available class
+      if (!filteredClassId && classes.length > 0) {
+        setFilteredClassId(classes[0].id);
       }
     }
   }, [filteredAcademicYearId, classes, filteredClassId]);
@@ -381,16 +371,14 @@ export default function LinkClasses() {
                   <SelectContent>
                     {classes?.length === 0 ? (
                       <SelectItem value="none" disabled>
-                        No classes for selected academic year
+                        No classes available
                       </SelectItem>
                     ) : (
-                      classes
-                        .filter(c => c.academicYearId === filteredAcademicYearId)
-                        .map((classObj) => (
-                          <SelectItem key={classObj.id} value={classObj.id.toString()}>
-                            {classObj.name}
-                          </SelectItem>
-                        ))
+                      classes?.map((classObj) => (
+                        <SelectItem key={classObj.id} value={classObj.id.toString()}>
+                          {classObj.name}
+                        </SelectItem>
+                      ))
                     )}
                   </SelectContent>
                 </Select>
