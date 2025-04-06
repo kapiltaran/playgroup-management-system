@@ -234,7 +234,7 @@ export default function LinkClasses() {
 
   // Set default academic year to current year when available
   useEffect(() => {
-    if (currentAcademicYear && !filteredAcademicYearId) {
+    if (currentAcademicYear) {
       setFilteredAcademicYearId(currentAcademicYear.id);
     }
   }, [currentAcademicYear]);
