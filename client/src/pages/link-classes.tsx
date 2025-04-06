@@ -246,22 +246,30 @@ export default function LinkClasses() {
 
   // Set default class when academic year is selected and classes are loaded
   useEffect(() => {
-    if (filteredAcademicYearId && classes?.length && !filteredClassId) {
+    if (filteredAcademicYearId && classes?.length) {
       // Find the first class for the selected academic year
-      const firstClass = classes.find(c => c.academicYearId === filteredAcademicYearId);
-      if (firstClass) {
-        setFilteredClassId(firstClass.id);
+      const filteredClasses = classes.filter(c => c.academicYearId === filteredAcademicYearId);
+      if (filteredClasses.length > 0) {
+        // If current class is no longer valid for the selected academic year, or no class is selected
+        const isCurrentClassValid = filteredClasses.some(c => c.id === filteredClassId);
+        if (!isCurrentClassValid || !filteredClassId) {
+          setFilteredClassId(filteredClasses[0].id);
+        }
       }
     }
   }, [filteredAcademicYearId, classes, filteredClassId]);
 
   // Set default batch when class is selected and batches are loaded
   useEffect(() => {
-    if (filteredClassId && batches?.length && !filteredBatchId) {
-      // Find the first batch for the selected class
-      const firstBatch = batches.find(b => b.classId === filteredClassId);
-      if (firstBatch) {
-        setFilteredBatchId(firstBatch.id);
+    if (filteredClassId && batches?.length) {
+      // Find batches for the selected class
+      const filteredBatches = batches.filter(b => b.classId === filteredClassId);
+      if (filteredBatches.length > 0) {
+        // If current batch is no longer valid for the selected class, or no batch is selected
+        const isCurrentBatchValid = filteredBatches.some(b => b.id === filteredBatchId);
+        if (!isCurrentBatchValid || !filteredBatchId) {
+          setFilteredBatchId(filteredBatches[0].id);
+        }
       }
     }
   }, [filteredClassId, batches, filteredBatchId]);
@@ -368,7 +376,7 @@ export default function LinkClasses() {
                   disabled={!filteredAcademicYearId || !classes?.length}
                 >
                   <SelectTrigger id="classFilter">
-                    <SelectValue placeholder="Select Class" />
+                    <SelectValue placeholder={classes?.length === 0 ? "No classes available" : "Select Class"} />
                   </SelectTrigger>
                   <SelectContent>
                     {classes?.length === 0 ? (
@@ -376,11 +384,13 @@ export default function LinkClasses() {
                         No classes for selected academic year
                       </SelectItem>
                     ) : (
-                      classes?.map((classObj) => (
-                        <SelectItem key={classObj.id} value={classObj.id.toString()}>
-                          {classObj.name}
-                        </SelectItem>
-                      ))
+                      classes
+                        .filter(c => c.academicYearId === filteredAcademicYearId)
+                        .map((classObj) => (
+                          <SelectItem key={classObj.id} value={classObj.id.toString()}>
+                            {classObj.name}
+                          </SelectItem>
+                        ))
                     )}
                   </SelectContent>
                 </Select>
@@ -397,7 +407,7 @@ export default function LinkClasses() {
                   disabled={!filteredClassId || !batches?.length}
                 >
                   <SelectTrigger id="batchFilter">
-                    <SelectValue placeholder="Select Batch" />
+                    <SelectValue placeholder={!batches || batches.length === 0 ? "No batches available" : "Select Batch"} />
                   </SelectTrigger>
                   <SelectContent>
                     {!batches || batches.length === 0 ? (
