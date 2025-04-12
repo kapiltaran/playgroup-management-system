@@ -1178,17 +1178,23 @@ export class MemStorage implements IStorage {
         // Log detailed information for debugging
         console.log(`Checking student ${s.id} (${s.fullName}): classId=${s.classId}, batchId=${s.batchId}, academicYear=${studentAcademicYear}, feeStructureAcademicYear=${feeStructure.academicYearId}`);
         
+        // Important: If student academic year is null, check if they don't have a batch at all
+        if (studentAcademicYear === null && s.classId === feeStructure.classId) {
+          // For students without a batch but with a matching class, include them
+          return true;
+        }
+        
         return studentAcademicYear === feeStructure.academicYearId;
       });
       
       console.log(`Found ${studentsInMatchingClassAndYear.length} students in the same class (${feeStructure.classId}) and academic year (${feeStructure.academicYearId}) as this fee structure`);
       
-      // Always include all matching students from the class and academic year
-      // This is key for handling multiple fee structures in the same class/year
+      // Include ALL students from both lists
+      // The ones with direct fee structure assignment and the ones in matching class/academic year
       const allMatchingStudents = [...studentsWithThisFeeStructure];
       
-      // Always add all students from the matching class and academic year combination
-      // regardless of whether they already have a fee structure assigned
+      // Add ALL students in the matching class and academic year
+      // This is critical for handling multiple fee structures properly
       for (const student of studentsInMatchingClassAndYear) {
         // Check if the student is not already in the list
         const alreadyInList = allMatchingStudents.some(s => s.id === student.id);
@@ -1197,6 +1203,11 @@ export class MemStorage implements IStorage {
           console.log(`Adding student ${student.id} (${student.fullName}) to matching students list for fee structure ${feeStructure.id}`);
           allMatchingStudents.push(student);
         }
+      }
+      
+      // Debug log all matching students
+      for (const student of allMatchingStudents) {
+        console.log(`Student ${student.id} (${student.fullName}) matched for fee structure ${feeStructure.id}`);
       }
       
       console.log(`Combined total: ${allMatchingStudents.length} matching students for fee structure ${feeStructure.id}`);
