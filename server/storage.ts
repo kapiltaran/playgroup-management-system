@@ -1007,29 +1007,43 @@ export class MemStorage implements IStorage {
 
   // Fee Reports methods
   async getPendingFees(classId?: number): Promise<any[]> {
+    console.log("Getting pending fees...");
+    
     // Get all students
     const allStudents = Array.from(this.students.values());
+    console.log(`Total students: ${allStudents.length}`);
     
     // Filter students based on class if specified
     let students: Student[] = [];
     if (classId) {
       // Get students in the specific class
       students = allStudents.filter(student => student.classId === classId && student.status === 'active');
+      console.log(`Students in class ${classId}: ${students.length}`);
     } else {
       // Get all active students
       students = allStudents.filter(student => student.status === 'active');
+      console.log(`Total active students: ${students.length}`);
     }
     
     // Get fee structures and payments for students
     const result = [];
     
     // First, add fee structures assigned to students
+    console.log(`Processing ${students.length} students with their assigned fee structures...`);
     for (const student of students) {
       // Skip if student has no fee structure assigned
-      if (!student.feeStructureId) continue;
+      if (!student.feeStructureId) {
+        console.log(`Student ${student.id} (${student.fullName}) has no fee structure assigned, continuing...`);
+        continue;
+      }
       
       const feeStructure = this.feeStructures.get(student.feeStructureId);
-      if (!feeStructure) continue;
+      if (!feeStructure) {
+        console.log(`Fee structure ${student.feeStructureId} for student ${student.id} not found, continuing...`);
+        continue;
+      }
+      
+      console.log(`Processing student ${student.id} (${student.fullName}) with fee structure ${feeStructure.id} (${feeStructure.name})...`);
       
       // Get payments for this student and fee structure
       const payments = Array.from(this.feePayments.values())
@@ -1038,13 +1052,19 @@ export class MemStorage implements IStorage {
           payment.feeStructureId === feeStructure.id
         );
       
+      console.log(`Found ${payments.length} payments for student ${student.id} and fee structure ${feeStructure.id}`);
+      
       // Calculate total paid amount
       const totalPaid = payments.reduce((sum, payment) => {
         return sum + parseFloat(payment.amount.toString());
       }, 0);
       
+      console.log(`Total paid amount for student ${student.id}: ${totalPaid}`);
+      
       // Calculate due amount
       const dueAmount = parseFloat(feeStructure.totalAmount.toString()) - totalPaid;
+      console.log(`Due amount for student ${student.id}: ${dueAmount} (total: ${feeStructure.totalAmount})`);
+      
       
       // Add to result if there's a pending amount
       if (dueAmount > 0) {
