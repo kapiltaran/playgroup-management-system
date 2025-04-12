@@ -314,9 +314,12 @@ export default function FeePayments() {
     
     // For unassigned fee structures, we'll set studentId to 0 as a marker
     // The backend will interpret this as an unassigned payment
+    
+    // Use the final totalAmount as the amount to be submitted to the API
+    // This ensures the calculated value (including discounts and misc amounts) is what's recorded
     const formDataToSubmit = {
       ...paymentFormData,
-      amount: paymentFormData.amount.toString()
+      amount: paymentFormData.totalAmount.toString()
     };
     
     if (paymentFormMode === "add") {
@@ -856,6 +859,9 @@ export default function FeePayments() {
                     // Check if this is an unassigned fee structure
                     const isUnassigned = selectedFeeStructure?.studentId === null;
                     
+                    // Get the due amount for calculations
+                    const dueAmount = selectedFeeStructure?.dueAmount.toString() || "0";
+                    
                     setPaymentFormData(prev => ({
                       ...prev,
                       feeStructureId: feeStructureId,
@@ -863,7 +869,12 @@ export default function FeePayments() {
                       // If the fee structure is unassigned, reset studentId
                       studentId: isUnassigned ? 0 : (selectedFeeStructure?.studentId || prev.studentId),
                       // Set the amount to the due amount if available
-                      amount: selectedFeeStructure?.dueAmount.toString() || prev.amount
+                      amount: dueAmount,
+                      // Reset discount and misc amounts
+                      discountAmount: "0",
+                      miscAmount: "0",
+                      // Set total amount equal to due amount initially
+                      totalAmount: dueAmount
                     }));
                   }}
                   disabled={paymentFormMode === "edit"}
