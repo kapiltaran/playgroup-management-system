@@ -1183,44 +1183,26 @@ export class MemStorage implements IStorage {
       
       console.log(`Found ${studentsInMatchingClassAndYear.length} students in the same class (${feeStructure.classId}) and academic year (${feeStructure.academicYearId}) as this fee structure`);
       
-      // Combine both sets of students, prioritizing those with direct fee structure assignments
+      // Always include all matching students from the class and academic year
+      // This is key for handling multiple fee structures in the same class/year
       const allMatchingStudents = [...studentsWithThisFeeStructure];
       
-      // Only add students from matching class/year if they don't already have a fee structure assigned
-      // and aren't already in our list
+      // Always add all students from the matching class and academic year combination
+      // regardless of whether they already have a fee structure assigned
       for (const student of studentsInMatchingClassAndYear) {
         // Check if the student is not already in the list
         const alreadyInList = allMatchingStudents.some(s => s.id === student.id);
         
-        // Check if student has no fee structure or if their fee structure is in a different academic year
-        // than their current batch (which would indicate they need to be updated)
-        let shouldAdd = false;
-        
-        if (!student.feeStructureId) {
-          // Student has no fee structure at all
-          shouldAdd = true;
-          console.log(`Student ${student.id} (${student.fullName}) has no fee structure, will be added to list`);
-        } else if (!alreadyInList) {
-          // Student has a fee structure but check if it matches their current academic year
-          const currentFeeStructure = this.feeStructures.get(student.feeStructureId);
-          if (currentFeeStructure) {
-            const studentAcademicYear = this.getStudentBatchAcademicYear(student.id);
-            
-            if (studentAcademicYear && currentFeeStructure.academicYearId !== studentAcademicYear) {
-              // Student has a fee structure but it's for a different academic year
-              console.log(`Student ${student.id} (${student.fullName}) has fee structure ${student.feeStructureId} but it's for academic year ${currentFeeStructure.academicYearId} when student is now in ${studentAcademicYear}`);
-              shouldAdd = true;
-            }
-          }
-        }
-        
-        if (shouldAdd && !alreadyInList) {
-          console.log(`Adding student ${student.id} (${student.fullName}) to matching students list`);
+        if (!alreadyInList) {
+          console.log(`Adding student ${student.id} (${student.fullName}) to matching students list for fee structure ${feeStructure.id}`);
           allMatchingStudents.push(student);
         }
       }
       
       console.log(`Combined total: ${allMatchingStudents.length} matching students for fee structure ${feeStructure.id}`);
+      
+      // Track if fee structure has been processed for at least one student
+      let feeStructureProcessed = false;
       
       if (allMatchingStudents.length > 0) {
         // For each matching student, create a pending fee entry
@@ -1245,6 +1227,8 @@ export class MemStorage implements IStorage {
           // Skip if this student has fully paid this fee structure
           if (studentDueAmount <= 0) {
             console.log(`Student ${student.id} (${student.fullName}) has fully paid fee structure ${feeStructure.id}, skipping...`);
+            // Still mark as processed even if skipped due to full payment
+            feeStructureProcessed = true;
             continue;
           }
           
@@ -1285,8 +1269,14 @@ export class MemStorage implements IStorage {
             dueAmount: studentDueAmount,
             status
           });
+          
+          // Mark as processed since we added this fee structure to a student
+          feeStructureProcessed = true;
         }
-      } else {
+      }
+      
+      // Only show as unassigned if the fee structure wasn't processed for any student
+      if (!feeStructureProcessed) {
         // No student assigned - show as unassigned
         console.log(`No matching students found for fee structure ${feeStructure.id}, displaying as "Unassigned"`);
         result.push({
