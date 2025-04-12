@@ -2748,6 +2748,22 @@ export class MemStorage implements IStorage {
       .filter(student => student.batchId === batchId)
       .sort((a, b) => b.id - a.id);
   }
+  
+  async getStudentsByClassAndAcademicYear(classId: number, academicYearId: number): Promise<Student[]> {
+    // Get all batches for this class and academic year
+    const matchingBatches = Array.from(this.batches.values())
+      .filter(batch => batch.classId === classId && batch.academicYearId === academicYearId);
+    
+    if (matchingBatches.length === 0) {
+      return [];
+    }
+    
+    // Get all students in these batches
+    const batchIds = matchingBatches.map(batch => batch.id);
+    return Array.from(this.students.values())
+      .filter(student => student.batchId !== null && batchIds.includes(student.batchId))
+      .sort((a, b) => b.id - a.id);
+  }
 }
 
 export const storage = new MemStorage();

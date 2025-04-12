@@ -754,6 +754,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Invalid fee structure ID" });
       }
       
+      // Get existing fee structure first
+      const existingFeeStructure = await storage.getFeeStructure(feeStructureId);
+      if (!existingFeeStructure) {
+        return res.status(404).json({ message: "Fee structure not found" });
+      }
+      
+      // Check if the fee structure has a due date in the past
+      if (existingFeeStructure.dueDate) {
+        const dueDate = new Date(existingFeeStructure.dueDate);
+        const today = new Date();
+        
+        if (dueDate < today) {
+          // Check if there are payments associated with this fee structure
+          const payments = await storage.getFeePayments(undefined, feeStructureId);
+          
+          if (payments.length > 0) {
+            return res.status(400).json({ 
+              message: "Cannot modify fee structure with past due date that has payments associated with it" 
+            });
+          }
+        }
+      }
+      
       // Use the full schema to validate but make all fields optional
       const updateData = z.object({
         name: z.string().optional(),
@@ -764,10 +787,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
         dueDate: z.string().nullable().optional()
       }).parse(req.body);
       
+      // If class or academic year ID is changing, note the old and new values
+      const classChanged = updateData.classId !== undefined && updateData.classId !== existingFeeStructure.classId;
+      const academicYearChanged = updateData.academicYearId !== undefined && 
+                                  updateData.academicYearId !== existingFeeStructure.academicYearId;
+      
+      // Update the fee structure
       const updatedFeeStructure = await storage.updateFeeStructure(feeStructureId, updateData);
       
       if (!updatedFeeStructure) {
         return res.status(404).json({ message: "Fee structure not found" });
+      }
+      
+      // If the class or academic year changed, update the fee structure assignments
+      if (classChanged || academicYearChanged) {
+        // Get new target class and academic year ID 
+        const targetClassId = updateData.classId || existingFeeStructure.classId;
+        const targetAcademicYearId = updateData.academicYearId || existingFeeStructure.academicYearId;
+        
+        // Get students in the target class and academic year
+        const affectedStudents = await storage.getStudentsByClassAndAcademicYear(
+          targetClassId, 
+          targetAcademicYearId
+        );
+        
+        // Link the updated fee structure to these students
+        for (const student of affectedStudents) {
+          await storage.updateStudent(student.id, { feeStructureId: feeStructureId });
+          
+          // Log activity for each student
+          await storage.createActivity({
+            type: 'fee',
+            action: 'assign',
+            details: { 
+              studentId: student.id, 
+              feeStructureId: feeStructureId,
+              feeName: updatedFeeStructure.name,
+              operation: 'auto-link-on-update'
+            }
+          });
+        }
       }
       
       res.json(updatedFeeStructure);
@@ -836,6 +895,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         const created = await storage.createFeeStructure(newStructure);
         clonedStructures.push(created);
+        
+        // Get all students in the target academic year and class
+        // And link them to this fee structure
+        const studentsToLink = await storage.getStudentsByClassAndAcademicYear(
+          targetClassId,
+          targetAcademicYearId
+        );
+        
+        // Link each student to the newly created fee structure
+        for (const student of studentsToLink) {
+          await storage.updateStudent(student.id, { feeStructureId: created.id });
+          
+          // Log activity for each student
+          await storage.createActivity({
+            type: 'fee',
+            action: 'assign',
+            details: { 
+              studentId: student.id, 
+              feeStructureId: created.id,
+              feeName: created.name,
+              operation: 'auto-link-on-clone'
+            }
+          });
+        }
       }
       
       res.status(201).json({
@@ -2644,28 +2727,77 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Link students to batch and associate fee structure (if available)
       for (const studentId of studentIds) {
-        // First link student to batch
-        await storage.updateStudent(studentId, { batchId });
-        
-        // Then associate fee structure if one exists for this class and academic year
-        if (matchingFeeStructures.length > 0) {
-          // Use the first matching fee structure found (most common case)
-          // You could enhance this with a priority or selection mechanism if needed
-          const feeStructureId = matchingFeeStructures[0].id;
-          await storage.updateStudent(studentId, { feeStructureId });
+        try {
+          // Get the student to check if they already have a fee structure
+          const student = await storage.getStudent(studentId);
+          if (!student) {
+            console.warn(`Student with ID ${studentId} not found, skipping`);
+            continue;
+          }
           
-          // Create activity log for fee structure assignment
-          await storage.createActivity({
-            type: 'fee',
-            action: 'assign',
-            details: { 
-              studentId, 
-              feeStructureId,
-              feeName: matchingFeeStructures[0].name,
-              className: batch.classId,
-              academicYearId: batch.academicYearId
-            }
+          // First link student to batch and class
+          await storage.updateStudent(studentId, { 
+            batchId,
+            classId: batch.classId // Ensure the class is set correctly
           });
+          
+          // Then associate fee structure if one exists for this class and academic year
+          if (matchingFeeStructures.length > 0) {
+            let selectedFeeStructure;
+            
+            // If there are multiple fee structures, try to pick the most appropriate one
+            if (matchingFeeStructures.length > 1) {
+              // Logic to choose the most appropriate fee structure
+              // For example, we could prioritize fee structures with due dates in the future
+              // or pick the newest one if multiple exist
+              
+              // Sort by due date (null dates last) and then by creation date (newest first)
+              const sortedFeeStructures = [...matchingFeeStructures].sort((a, b) => {
+                // Put fee structures with null due dates at the end
+                if (!a.dueDate && b.dueDate) return 1;
+                if (a.dueDate && !b.dueDate) return -1;
+                
+                if (a.dueDate && b.dueDate) {
+                  const dateA = new Date(a.dueDate);
+                  const dateB = new Date(b.dueDate);
+                  
+                  // Sort by due date (furthest in future first)
+                  if (dateA > dateB) return -1;
+                  if (dateA < dateB) return 1;
+                }
+                
+                // If due dates are the same or both null, sort by creation date (newest first)
+                const createdAtA = a.createdAt ? new Date(a.createdAt) : new Date(0);
+                const createdAtB = b.createdAt ? new Date(b.createdAt) : new Date(0);
+                return createdAtB.getTime() - createdAtA.getTime();
+              });
+              
+              selectedFeeStructure = sortedFeeStructures[0];
+            } else {
+              // Only one fee structure, use it
+              selectedFeeStructure = matchingFeeStructures[0];
+            }
+            
+            // Update the student with the selected fee structure
+            await storage.updateStudent(studentId, { feeStructureId: selectedFeeStructure.id });
+            
+            // Create activity log for fee structure assignment
+            await storage.createActivity({
+              type: 'fee',
+              action: 'assign',
+              details: { 
+                studentId, 
+                feeStructureId: selectedFeeStructure.id,
+                feeName: selectedFeeStructure.name,
+                className: batch.classId,
+                academicYearId: batch.academicYearId,
+                operation: 'auto-link-on-batch-assignment'
+              }
+            });
+          }
+        } catch (error) {
+          console.error(`Error processing student ${studentId}:`, error);
+          // Continue with next student
         }
       }
       
