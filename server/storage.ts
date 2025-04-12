@@ -1007,16 +1007,17 @@ export class MemStorage implements IStorage {
 
   // Fee Reports methods
   async getPendingFees(classId?: number): Promise<any[]> {
-    let students: Student[] = [];
+    // Get all students
+    const allStudents = Array.from(this.students.values());
     
+    // Filter students based on class if specified
+    let students: Student[] = [];
     if (classId) {
       // Get students in the specific class
-      students = Array.from(this.students.values())
-        .filter(student => student.classId === classId && student.status === 'active');
+      students = allStudents.filter(student => student.classId === classId && student.status === 'active');
     } else {
       // Get all active students
-      students = Array.from(this.students.values())
-        .filter(student => student.status === 'active');
+      students = allStudents.filter(student => student.status === 'active');
     }
     
     // Get fee structures and payments for students
@@ -1080,19 +1081,44 @@ export class MemStorage implements IStorage {
       // Calculate due amount (for new fee structures, there are no payments yet)
       const dueAmount = parseFloat(feeStructure.totalAmount.toString());
       
-      result.push({
-        studentId: null, // No student assigned yet
-        studentName: "Unassigned", // Placeholder for unassigned fee structures
-        classId: feeStructure.classId,
-        className: classObj ? classObj.name : 'Not Assigned',
-        feeStructureId: feeStructure.id,
-        feeName: feeStructure.name,
-        dueDate: feeStructure.dueDate,
-        totalAmount: feeStructure.totalAmount,
-        paidAmount: 0, // No payments yet
-        dueAmount,
-        status: feeStructure.dueDate && new Date(feeStructure.dueDate) < new Date() ? 'overdue' : 'upcoming'
-      });
+      // Check if any student has this fee structure assigned but wasn't included already
+      // This handles cases where a student was just assigned but wasn't caught in the first loop
+      const studentsWithThisFeeStructure = allStudents.filter(
+        s => s.feeStructureId === feeStructure.id && s.status === 'active'
+      );
+      
+      if (studentsWithThisFeeStructure.length > 0) {
+        // Use the first student we find with this fee structure
+        const student = studentsWithThisFeeStructure[0];
+        result.push({
+          studentId: student.id,
+          studentName: student.fullName,
+          classId: student.classId,
+          className: student.classId ? (this.classes.get(student.classId)?.name || 'Unknown') : 'Not Assigned',
+          feeStructureId: feeStructure.id,
+          feeName: feeStructure.name,
+          dueDate: feeStructure.dueDate,
+          totalAmount: feeStructure.totalAmount,
+          paidAmount: 0, // No payments recorded yet
+          dueAmount,
+          status: feeStructure.dueDate && new Date(feeStructure.dueDate) < new Date() ? 'overdue' : 'upcoming'
+        });
+      } else {
+        // No student assigned - show as unassigned
+        result.push({
+          studentId: null, // No student assigned yet
+          studentName: "Unassigned", // Placeholder for unassigned fee structures
+          classId: feeStructure.classId,
+          className: classObj ? classObj.name : 'Not Assigned',
+          feeStructureId: feeStructure.id,
+          feeName: feeStructure.name,
+          dueDate: feeStructure.dueDate,
+          totalAmount: feeStructure.totalAmount,
+          paidAmount: 0, // No payments yet
+          dueAmount,
+          status: feeStructure.dueDate && new Date(feeStructure.dueDate) < new Date() ? 'overdue' : 'upcoming'
+        });
+      }
     }
     
     // Sort by due date, with overdue first
