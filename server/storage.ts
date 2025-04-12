@@ -182,6 +182,7 @@ export interface IStorage {
   updateBatch(id: number, batch: Partial<InsertBatch>): Promise<Batch | undefined>;
   deleteBatch(id: number): Promise<boolean>;
   getStudentsByBatch(batchId: number): Promise<Student[]>;
+  getStudentsByClassAndAcademicYear(classId: number, academicYearId: number): Promise<Student[]>;
 }
 
 export class MemStorage implements IStorage {

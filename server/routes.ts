@@ -716,6 +716,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const insertData = insertFeeStructureSchema.parse(req.body);
       const feeStructure = await storage.createFeeStructure(insertData);
+      
+      // Auto-link this fee structure to all students in the corresponding class and academic year
+      // Get all students that are in batches related to this class and academic year
+      const affectedStudents = await storage.getStudentsByClassAndAcademicYear(
+        insertData.classId, 
+        insertData.academicYearId
+      );
+      
+      // Link the fee structure to each student
+      for (const student of affectedStudents) {
+        await storage.updateStudent(student.id, { feeStructureId: feeStructure.id });
+        
+        // Log activity for each student
+        await storage.createActivity({
+          type: 'fee',
+          action: 'assign',
+          details: { 
+            studentId: student.id, 
+            feeStructureId: feeStructure.id,
+            feeName: feeStructure.name,
+            operation: 'auto-link-on-creation'
+          }
+        });
+      }
+      
       res.status(201).json(feeStructure);
     } catch (error) {
       handleZodError(error, res);
