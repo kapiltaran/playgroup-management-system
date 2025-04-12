@@ -718,27 +718,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const feeStructure = await storage.createFeeStructure(insertData);
       
       // Auto-link this fee structure to all students in the corresponding class and academic year
-      // Get all students that are in batches related to this class and academic year
-      const affectedStudents = await storage.getStudentsByClassAndAcademicYear(
-        insertData.classId, 
-        insertData.academicYearId
-      );
-      
-      // Link the fee structure to each student
-      for (const student of affectedStudents) {
-        await storage.updateStudent(student.id, { feeStructureId: feeStructure.id });
+      try {
+        // Get all batches for this class and academic year
+        const allBatches = await storage.getAllBatches();
+        const matchingBatches = allBatches.filter(
+          batch => batch.classId === insertData.classId && batch.academicYearId === insertData.academicYearId
+        );
         
-        // Log activity for each student
-        await storage.createActivity({
-          type: 'fee',
-          action: 'assign',
-          details: { 
-            studentId: student.id, 
-            feeStructureId: feeStructure.id,
-            feeName: feeStructure.name,
-            operation: 'auto-link-on-creation'
+        if (matchingBatches.length > 0) {
+          // Get all students in these batches 
+          const batchIds = matchingBatches.map(batch => batch.id);
+          const allStudents = await storage.getStudents();
+          const affectedStudents = allStudents.filter(
+            student => student.batchId !== null && batchIds.includes(student.batchId)
+          );
+          
+          // Link the fee structure to each student
+          for (const student of affectedStudents) {
+            await storage.updateStudent(student.id, { feeStructureId: feeStructure.id });
+            
+            // Log activity for each student
+            await storage.createActivity({
+              type: 'fee',
+              action: 'assign',
+              details: { 
+                studentId: student.id, 
+                feeStructureId: feeStructure.id,
+                feeName: feeStructure.name,
+                operation: 'auto-link-on-creation'
+              }
+            });
           }
-        });
+        }
+      } catch (linkError) {
+        console.error("Error auto-linking fee structure to students:", linkError);
+        // Don't fail the main request due to auto-linking issues
       }
       
       res.status(201).json(feeStructure);
@@ -801,31 +815,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // If the class or academic year changed, update the fee structure assignments
       if (classChanged || academicYearChanged) {
-        // Get new target class and academic year ID 
-        const targetClassId = updateData.classId || existingFeeStructure.classId;
-        const targetAcademicYearId = updateData.academicYearId || existingFeeStructure.academicYearId;
-        
-        // Get students in the target class and academic year
-        const affectedStudents = await storage.getStudentsByClassAndAcademicYear(
-          targetClassId, 
-          targetAcademicYearId
-        );
-        
-        // Link the updated fee structure to these students
-        for (const student of affectedStudents) {
-          await storage.updateStudent(student.id, { feeStructureId: feeStructureId });
+        try {
+          // Get new target class and academic year ID 
+          const targetClassId = updateData.classId || existingFeeStructure.classId;
+          const targetAcademicYearId = updateData.academicYearId || existingFeeStructure.academicYearId;
           
-          // Log activity for each student
-          await storage.createActivity({
-            type: 'fee',
-            action: 'assign',
-            details: { 
-              studentId: student.id, 
-              feeStructureId: feeStructureId,
-              feeName: updatedFeeStructure.name,
-              operation: 'auto-link-on-update'
+          // Get all batches for this class and academic year
+          const allBatches = await storage.getAllBatches();
+          const matchingBatches = allBatches.filter(
+            batch => batch.classId === targetClassId && batch.academicYearId === targetAcademicYearId
+          );
+          
+          if (matchingBatches.length > 0) {
+            // Get all students in these batches 
+            const batchIds = matchingBatches.map(batch => batch.id);
+            const allStudents = await storage.getStudents();
+            const affectedStudents = allStudents.filter(
+              student => student.batchId !== null && batchIds.includes(student.batchId)
+            );
+            
+            // Link the updated fee structure to these students
+            for (const student of affectedStudents) {
+              await storage.updateStudent(student.id, { feeStructureId: feeStructureId });
+              
+              // Log activity for each student
+              await storage.createActivity({
+                type: 'fee',
+                action: 'assign',
+                details: { 
+                  studentId: student.id, 
+                  feeStructureId: feeStructureId,
+                  feeName: updatedFeeStructure.name,
+                  operation: 'auto-link-on-update'
+                }
+              });
             }
-          });
+          }
+        } catch (linkError) {
+          console.error("Error auto-linking updated fee structure to students:", linkError);
+          // Don't fail the main request due to auto-linking issues
         }
       }
       
@@ -896,28 +924,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const created = await storage.createFeeStructure(newStructure);
         clonedStructures.push(created);
         
-        // Get all students in the target academic year and class
-        // And link them to this fee structure
-        const studentsToLink = await storage.getStudentsByClassAndAcademicYear(
-          targetClassId,
-          targetAcademicYearId
-        );
-        
-        // Link each student to the newly created fee structure
-        for (const student of studentsToLink) {
-          await storage.updateStudent(student.id, { feeStructureId: created.id });
+        try {
+          // Get all batches for this class and academic year
+          const allBatches = await storage.getAllBatches();
+          const matchingBatches = allBatches.filter(
+            batch => batch.classId === targetClassId && batch.academicYearId === targetAcademicYearId
+          );
           
-          // Log activity for each student
-          await storage.createActivity({
-            type: 'fee',
-            action: 'assign',
-            details: { 
-              studentId: student.id, 
-              feeStructureId: created.id,
-              feeName: created.name,
-              operation: 'auto-link-on-clone'
+          if (matchingBatches.length > 0) {
+            // Get all students in these batches 
+            const batchIds = matchingBatches.map(batch => batch.id);
+            const allStudents = await storage.getStudents();
+            const studentsToLink = allStudents.filter(
+              student => student.batchId !== null && batchIds.includes(student.batchId)
+            );
+            
+            // Link each student to the newly created fee structure
+            for (const student of studentsToLink) {
+              await storage.updateStudent(student.id, { feeStructureId: created.id });
+              
+              // Log activity for each student
+              await storage.createActivity({
+                type: 'fee',
+                action: 'assign',
+                details: { 
+                  studentId: student.id, 
+                  feeStructureId: created.id,
+                  feeName: created.name,
+                  operation: 'auto-link-on-clone'
+                }
+              });
             }
-          });
+          }
+        } catch (linkError) {
+          console.error("Error auto-linking cloned fee structure to students:", linkError);
+          // Don't fail the main request due to auto-linking issues
         }
       }
       
