@@ -1048,6 +1048,24 @@ export class MemStorage implements IStorage {
       
       // Add to result if there's a pending amount
       if (dueAmount > 0) {
+        // Determine the status based on payments and due date
+        let status = 'upcoming';
+        
+        // Check if there are any payments made already
+        const hasPartialPayment = totalPaid > 0;
+        
+        // Check if the due date is in the past
+        const isDueDatePast = feeStructure.dueDate && new Date(feeStructure.dueDate) < new Date();
+        
+        // If due date is past and no payments have been made, it's overdue
+        // If due date is past but some payments have been made, it's partially paid but still overdue
+        if (isDueDatePast) {
+          status = hasPartialPayment ? 'partial-overdue' : 'overdue';
+        } else {
+          // If due date is not past, but some payments have been made
+          status = hasPartialPayment ? 'partial-paid' : 'upcoming';
+        }
+        
         result.push({
           studentId: student.id,
           studentName: student.fullName,
@@ -1059,7 +1077,7 @@ export class MemStorage implements IStorage {
           totalAmount: feeStructure.totalAmount,
           paidAmount: totalPaid,
           dueAmount,
-          status: feeStructure.dueDate && new Date(feeStructure.dueDate) < new Date() ? 'overdue' : 'upcoming'
+          status
         });
       }
     }

@@ -1066,6 +1066,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/fee-payments", async (req: Request, res: Response) => {
     try {
       const insertData = insertFeePaymentSchema.parse(req.body);
+      
+      // Check if we're trying to pay more than what's due
+      const { studentId, feeStructureId, amount } = insertData;
+      
+      // Get the fee structure
+      const feeStructure = await storage.getFeeStructure(feeStructureId);
+      if (!feeStructure) {
+        return res.status(404).json({ message: "Fee structure not found" });
+      }
+      
+      // Get existing payments for this student and fee structure
+      const existingPayments = await storage.getFeePayments(studentId, feeStructureId);
+      
+      // Calculate total paid amount so far
+      const totalPaid = existingPayments.reduce((sum, payment) => {
+        return sum + parseFloat(payment.amount.toString());
+      }, 0);
+      
+      // Total amount due from fee structure
+      const totalDue = parseFloat(feeStructure.totalAmount.toString());
+      
+      // Calculate remaining amount due
+      const remainingDue = totalDue - totalPaid;
+      
+      // Validate the payment amount
+      const paymentAmount = parseFloat(amount);
+      if (paymentAmount <= 0) {
+        return res.status(400).json({ message: "Payment amount must be greater than zero" });
+      }
+      
+      if (paymentAmount > remainingDue) {
+        return res.status(400).json({ 
+          message: `Payment amount exceeds remaining balance. Maximum payment allowed: ${remainingDue}`
+        });
+      }
+      
+      // Create the payment
       const payment = await storage.createFeePayment(insertData);
       res.status(201).json(payment);
     } catch (error) {
