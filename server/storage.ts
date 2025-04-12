@@ -1076,9 +1076,13 @@ export class MemStorage implements IStorage {
       const dueAmount = parseFloat(feeStructure.totalAmount.toString()) - totalPaid;
       console.log(`Due amount for student ${student.id}: ${dueAmount} (total: ${feeStructure.totalAmount})`);
       
+      // If dueAmount is zero or negative (fully paid or overpaid), skip this record
+      if (dueAmount <= 0) {
+        console.log(`Student ${student.id} (${student.fullName}) has fully paid fee structure ${feeStructure.id}, skipping...`);
+        continue;
+      }
       
-      // Add to result if there's a pending amount
-      if (dueAmount > 0) {
+      // Add to result (due amount is greater than zero)
         // Determine the status based on payments and due date
         let status = 'upcoming';
         
@@ -1110,7 +1114,6 @@ export class MemStorage implements IStorage {
           dueAmount,
           status
         });
-      }
     }
     
     // Now, add any fee structures that aren't assigned to students yet
@@ -1127,8 +1130,31 @@ export class MemStorage implements IStorage {
       // Get the class for this fee structure
       const classObj = feeStructure.classId ? this.classes.get(feeStructure.classId) : null;
       
-      // Calculate due amount (for new fee structures, there are no payments yet)
-      const dueAmount = parseFloat(feeStructure.totalAmount.toString());
+      // For unassigned fee structures, we need to check if there are any payments made already
+      // This handles cases where a fee structure was assigned to a student who paid but then was reassigned
+      let totalPaid = 0;
+      const paymentsForStructure = Array.from(this.feePayments.values())
+        .filter(p => p.feeStructureId === feeStructure.id);
+      
+      if (paymentsForStructure.length > 0) {
+        console.log(`Found ${paymentsForStructure.length} payments for unassigned fee structure ${feeStructure.id}`);
+        
+        // Sum up all payments for this fee structure
+        totalPaid = paymentsForStructure.reduce((sum, payment) => {
+          return sum + parseFloat(payment.amount.toString());
+        }, 0);
+        
+        console.log(`Total paid amount for unassigned fee structure ${feeStructure.id}: ${totalPaid}`);
+      }
+      
+      // Calculate due amount
+      const dueAmount = parseFloat(feeStructure.totalAmount.toString()) - totalPaid;
+      
+      // If fee structure is fully paid, skip it
+      if (dueAmount <= 0) {
+        console.log(`Fee structure ${feeStructure.id} (${feeStructure.name}) is fully paid, skipping...`);
+        continue;
+      }
       
       // Check if any student has this fee structure assigned but wasn't included already
       // This handles cases where a student was just assigned but wasn't caught in the first loop
