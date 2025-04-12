@@ -611,6 +611,16 @@ export class MemStorage implements IStorage {
   async getStudent(id: number): Promise<Student | undefined> {
     return this.students.get(id);
   }
+  
+  getStudentBatchAcademicYear(studentId: number): number | null {
+    const student = this.students.get(studentId);
+    if (!student || !student.batchId) return null;
+    
+    const batch = this.batches.get(student.batchId);
+    if (!batch) return null;
+    
+    return batch.academicYearId;
+  }
 
   async createStudent(insertStudent: InsertStudent): Promise<Student> {
     const id = this.studentId++;
