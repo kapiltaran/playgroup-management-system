@@ -1,9 +1,9 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { insertStudentSchema } from "@shared/schema";
-import { QueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import {
   Form,
@@ -56,7 +56,19 @@ const formSchema = insertStudentSchema.extend({
   state: z.string().min(2, "State/Province must be at least 2 characters"),
   country: z.string().min(2, "Country must be at least 2 characters"),
   status: z.enum(["active", "inactive", "on_leave"]),
-  createAccount: z.boolean().optional().default(true)
+  createAccount: z.boolean().optional().default(true),
+  // Optional academic year and class fields
+  academicYearId: z.number().nullable().optional(),
+  classId: z.number().nullable().optional()
+}).refine(data => {
+  // If academicYearId is provided, classId is required
+  if (data.academicYearId !== undefined && data.academicYearId !== null) {
+    return data.classId !== undefined && data.classId !== null;
+  }
+  return true;
+}, {
+  message: "Class is required when Academic Year is selected",
+  path: ["classId"]
 });
 
 type StudentFormValues = z.infer<typeof formSchema>;
@@ -80,6 +92,19 @@ export function StudentForm({
 }: StudentFormProps) {
   const { toast } = useToast();
   const [creatingAccount, setCreatingAccount] = useState(false);
+  const [selectedAcademicYearId, setSelectedAcademicYearId] = useState<number | null>(null);
+  
+  // Query academic years
+  const { data: academicYears = [] } = useQuery<any[]>({
+    queryKey: ["/api/academic-years"],
+    enabled: isOpen && !isEditing, // Only fetch when form is open and not in edit mode
+  });
+  
+  // Query classes, filtered by academic year if selected
+  const { data: classes = [] } = useQuery<any[]>({
+    queryKey: ["/api/classes"],
+    enabled: isOpen && !isEditing, // Only fetch when form is open and not in edit mode
+  });
   
   // Log incoming defaultValues for debugging
   console.log("🔴 StudentForm received defaultValues:", defaultValues);
@@ -133,6 +158,10 @@ export function StudentForm({
         isValid: form.formState.isValid,
         errors: form.formState.errors
       }, null, 2));
+      
+      // Extract selected academicYearId and classId before removing createAccount
+      const academicYearId = studentData.academicYearId;
+      const classId = studentData.classId;
       
       // Remove createAccount as it's not part of the Student schema
       if ('createAccount' in studentData) {
@@ -201,11 +230,74 @@ export function StudentForm({
           
           console.log("Using student ID for account creation:", studentId);
           
+          // If both academicYearId and classId were provided, find a matching batch and link student
+          if (academicYearId && classId) {
+            try {
+              console.log(`Looking for batch with academicYearId=${academicYearId} and classId=${classId}`);
+              
+              // Fetch batches to find one matching the academic year and class
+              const batchesResponse = await fetch(`/api/batches/academic-year/${academicYearId}`);
+              
+              if (!batchesResponse.ok) {
+                throw new Error(`Failed to fetch batches: ${batchesResponse.statusText}`);
+              }
+              
+              const batches = await batchesResponse.json();
+              const matchingBatch = batches.find((batch: any) => batch.classId === classId);
+              
+              if (matchingBatch) {
+                console.log(`Found matching batch: ${matchingBatch.id} - ${matchingBatch.name}`);
+                
+                // Link student to batch
+                const linkResponse = await fetch(`/api/students/batch/${matchingBatch.id}`, {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json'
+                  },
+                  body: JSON.stringify({ studentIds: [studentId] })
+                });
+                
+                if (!linkResponse.ok) {
+                  console.error(`Failed to link student to batch: ${linkResponse.statusText}`);
+                  const errorData = await linkResponse.json();
+                  console.error("Error details:", errorData);
+                } else {
+                  console.log("Successfully linked student to batch and associated fee structure");
+                  
+                  // Invalidate relevant queries
+                  queryClient.invalidateQueries({ queryKey: ["/api/students"] });
+                  queryClient.invalidateQueries({ queryKey: ["/api/students/batch", matchingBatch.id] });
+                  queryClient.invalidateQueries({ queryKey: ["/api/fee-reports/pending"] });
+                  
+                  toast({
+                    title: "Success",
+                    description: "Student added successfully and linked to class.",
+                  });
+                }
+              } else {
+                console.log(`No matching batch found for academicYearId=${academicYearId} and classId=${classId}`);
+                toast({
+                  title: "Student Added",
+                  description: "Student was created but could not be assigned to a batch. You can assign the student to a batch later.",
+                });
+              }
+            } catch (error) {
+              console.error("Error linking student to batch:", error);
+              toast({
+                variant: "destructive",
+                title: "Warning",
+                description: "Student was created but there was an error linking to the selected class. You can assign the student to a class later.",
+              });
+            }
+          }
+          
           if (!createAccount) {
-            toast({
-              title: "Success",
-              description: "Student added successfully.",
-            });
+            if (!academicYearId || !classId) {
+              toast({
+                title: "Success",
+                description: "Student added successfully.",
+              });
+            }
             return;
           }
         } catch (error) {
@@ -502,6 +594,80 @@ export function StudentForm({
                   </FormItem>
                 )}
               />
+
+              {/* Only show academic year and class fields when creating a new student */}
+              {!isEditing && (
+                <div className="grid grid-cols-2 gap-4 pt-4 border-t border-gray-200">
+                  <FormField
+                    control={form.control}
+                    name="academicYearId"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Academic Year (Optional)</FormLabel>
+                        <Select
+                          onValueChange={(value) => {
+                            const numValue = parseInt(value);
+                            setSelectedAcademicYearId(numValue);
+                            field.onChange(numValue);
+                          }}
+                          value={field.value?.toString() || ""}
+                        >
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select academic year" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="">None</SelectItem>
+                            {academicYears?.map((year: any) => (
+                              <SelectItem key={year.id} value={year.id.toString()}>
+                                {year.name} {year.isCurrent ? "(Current)" : ""}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="classId"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Class {selectedAcademicYearId ? "(Required)" : "(Optional)"}</FormLabel>
+                        <Select
+                          onValueChange={(value) => {
+                            const numValue = parseInt(value);
+                            field.onChange(numValue);
+                          }}
+                          value={field.value?.toString() || ""}
+                          disabled={!selectedAcademicYearId}
+                        >
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder={selectedAcademicYearId ? "Select class" : "Select academic year first"} />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="">None</SelectItem>
+                            {classes?.map((cls: any) => (
+                              <SelectItem key={cls.id} value={cls.id.toString()}>
+                                {cls.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <div className="col-span-2 text-sm text-gray-500">
+                    Choosing an academic year and class will automatically assign the student to that class.
+                  </div>
+                </div>
+              )}
               
               <FormField
                 control={form.control}
