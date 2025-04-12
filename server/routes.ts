@@ -1067,8 +1067,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const insertData = insertFeePaymentSchema.parse(req.body);
       
-      // Check if we're trying to pay more than what's due
-      const { studentId, feeStructureId, amount } = insertData;
+      // Check if we're trying to pay more than what's due, accounting for misc charges
+      const { studentId, feeStructureId, amount, notes } = insertData;
       
       // Get the fee structure
       const feeStructure = await storage.getFeeStructure(feeStructureId);
@@ -1096,7 +1096,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Payment amount must be greater than zero" });
       }
       
-      if (paymentAmount > remainingDue) {
+      // Check if this payment includes miscellaneous charges
+      // We look for "Additional charges:" in the notes field which is added by the frontend
+      const hasMiscCharges = notes && notes.includes("Additional charges:");
+      
+      // If there are no misc charges, enforce the normal validation
+      // If misc charges are present, allow the payment amount to exceed the due amount
+      if (!hasMiscCharges && paymentAmount > remainingDue) {
         return res.status(400).json({ 
           message: `Payment amount exceeds remaining balance. Maximum payment allowed: ${remainingDue}`
         });
@@ -1126,6 +1132,57 @@ export async function registerRoutes(app: Express): Promise<Server> {
         receiptNumber: z.string().nullable().optional(),
         notes: z.string().nullable().optional()
       }).parse(req.body);
+      
+      // If updating the amount or fee structure, check remaining due
+      if (updateData.amount || updateData.feeStructureId) {
+        // Get the existing payment
+        const existingPayment = await storage.getFeePayment(paymentId);
+        if (!existingPayment) {
+          return res.status(404).json({ message: "Fee payment not found" });
+        }
+        
+        // Get the fee structure (either the updated one or the existing one)
+        const feeStructureId = updateData.feeStructureId || existingPayment.feeStructureId;
+        const studentId = updateData.studentId || existingPayment.studentId;
+        
+        const feeStructure = await storage.getFeeStructure(feeStructureId);
+        if (!feeStructure) {
+          return res.status(404).json({ message: "Fee structure not found" });
+        }
+        
+        // Get all payments for this student and fee structure except this one
+        const allPayments = await storage.getFeePayments(studentId, feeStructureId);
+        const otherPayments = allPayments.filter(p => p.id !== paymentId);
+        
+        // Calculate total paid amount from other payments
+        const totalPaid = otherPayments.reduce((sum, payment) => {
+          return sum + parseFloat(payment.amount.toString());
+        }, 0);
+        
+        // Calculate remaining due
+        const totalDue = parseFloat(feeStructure.totalAmount.toString());
+        const remainingDue = totalDue - totalPaid;
+        
+        // Validate payment amount if it's being updated
+        if (updateData.amount) {
+          const paymentAmount = parseFloat(updateData.amount);
+          if (paymentAmount <= 0) {
+            return res.status(400).json({ message: "Payment amount must be greater than zero" });
+          }
+          
+          // Check for misc charges in the notes
+          const notes = updateData.notes || existingPayment.notes;
+          const hasMiscCharges = notes && notes.includes("Additional charges:");
+          
+          // Only enforce validation if there are no misc charges
+          if (!hasMiscCharges && paymentAmount > remainingDue) {
+            return res.status(400).json({
+              message: `Payment amount exceeds remaining balance. Maximum payment allowed: ${remainingDue}`
+            });
+          }
+        }
+      }
+      
       const updatedPayment = await storage.updateFeePayment(paymentId, updateData);
       
       if (!updatedPayment) {
