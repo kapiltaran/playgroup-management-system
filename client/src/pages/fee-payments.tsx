@@ -317,9 +317,28 @@ export default function FeePayments() {
     
     // Use the final totalAmount as the amount to be submitted to the API
     // This ensures the calculated value (including discounts and misc amounts) is what's recorded
+    // Add notes about discount if applicable
+    const hasDiscount = parseFloat(paymentFormData.discountAmount || "0") > 0;
+    const hasMisc = parseFloat(paymentFormData.miscAmount || "0") > 0;
+    
+    let notes = paymentFormData.notes || "";
+    
+    // If a discount was applied, add a note about it
+    if (hasDiscount) {
+      const discountNote = `Discount applied: ${currencySymbol}${parseFloat(paymentFormData.discountAmount).toFixed(2)}`;
+      notes = notes ? `${notes}\n${discountNote}` : discountNote;
+    }
+    
+    // If misc charges were added, note them too
+    if (hasMisc) {
+      const miscNote = `Additional charges: ${currencySymbol}${parseFloat(paymentFormData.miscAmount).toFixed(2)}`;
+      notes = notes ? `${notes}\n${miscNote}` : miscNote;
+    }
+    
     const formDataToSubmit = {
       ...paymentFormData,
-      amount: paymentFormData.totalAmount.toString()
+      amount: paymentFormData.totalAmount.toString(),
+      notes: notes
     };
     
     if (paymentFormMode === "add") {

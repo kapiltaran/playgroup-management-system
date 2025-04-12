@@ -1072,13 +1072,21 @@ export class MemStorage implements IStorage {
       
       console.log(`Total paid amount for student ${student.id}: ${totalPaid}`);
       
+      // Check if there was a discounted payment
+      // We determine this by checking if the record was created by the fee payment form
+      // with discounts applied (looking at notes field containing "discount applied")
+      const hasDiscountApplied = payments.some(payment => 
+        payment.notes && payment.notes.toLowerCase().includes('discount applied')
+      );
+      
       // Calculate due amount
       const dueAmount = parseFloat(feeStructure.totalAmount.toString()) - totalPaid;
       console.log(`Due amount for student ${student.id}: ${dueAmount} (total: ${feeStructure.totalAmount})`);
       
-      // If dueAmount is zero or negative (fully paid or overpaid), skip this record
-      if (dueAmount <= 0) {
-        console.log(`Student ${student.id} (${student.fullName}) has fully paid fee structure ${feeStructure.id}, skipping...`);
+      // If dueAmount is zero or negative (fully paid or overpaid), or if a discount was applied, skip this record
+      if (dueAmount <= 0 || hasDiscountApplied) {
+        const reason = dueAmount <= 0 ? "fully paid" : "discount applied";
+        console.log(`Student ${student.id} (${student.fullName}) has ${reason} for fee structure ${feeStructure.id}, skipping...`);
         continue;
       }
       
@@ -1232,13 +1240,19 @@ export class MemStorage implements IStorage {
             return sum + parseFloat(payment.amount.toString());
           }, 0);
           
+          // Check if there was a discounted payment for this specific student
+          const hasDiscountApplied = studentPayments.some(payment => 
+            payment.notes && payment.notes.toLowerCase().includes('discount applied')
+          );
+          
           // Calculate student-specific due amount
           const studentDueAmount = parseFloat(feeStructure.totalAmount.toString()) - studentPaidAmount;
           
-          // Skip if this student has fully paid this fee structure
-          if (studentDueAmount <= 0) {
-            console.log(`Student ${student.id} (${student.fullName}) has fully paid fee structure ${feeStructure.id}, skipping...`);
-            // Still mark as processed even if skipped due to full payment
+          // Skip if this student has fully paid this fee structure or has a discount applied
+          if (studentDueAmount <= 0 || hasDiscountApplied) {
+            const reason = studentDueAmount <= 0 ? "fully paid" : "discount applied";
+            console.log(`Student ${student.id} (${student.fullName}) has ${reason} for fee structure ${feeStructure.id}, skipping...`);
+            // Still mark as processed even if skipped due to full payment or discount
             feeStructureProcessed = true;
             continue;
           }
