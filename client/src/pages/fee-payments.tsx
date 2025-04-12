@@ -415,13 +415,13 @@ export default function FeePayments() {
   // Prepare payment receipt number
   useEffect(() => {
     if (paymentFormMode === "add" && !paymentFormData.receiptNumber) {
-      const nextId = (payments?.length || 0) + 1;
+      const nextId = (paymentsRaw?.length || 0) + 1;
       setPaymentFormData(prev => ({
         ...prev,
         receiptNumber: `RC-${nextId.toString().padStart(3, '0')}`
       }));
     }
-  }, [paymentFormMode, payments?.length, paymentFormData.receiptNumber]);
+  }, [paymentFormMode, paymentsRaw?.length, paymentFormData.receiptNumber]);
 
   // Auto-populate reminder message
   useEffect(() => {
@@ -634,7 +634,7 @@ export default function FeePayments() {
 
           <div className="bg-white shadow rounded-lg">
             <DataTable
-              data={payments || []}
+              data={paymentsRaw || []}
               isLoading={isLoadingPayments}
               searchKey="studentId"
               searchFunction={(item, query) => {
@@ -727,9 +727,13 @@ export default function FeePayments() {
 
           <div className="bg-white shadow rounded-lg">
             <DataTable
-              data={reminders || []}
+              data={remindersRaw || []}
               isLoading={isLoadingReminders}
-              searchKey="studentName"
+              searchKey="studentId"
+              searchFunction={(item, query) => {
+                const studentName = getStudentName(item.studentId).toLowerCase();
+                return studentName.includes(query.toLowerCase());
+              }}
               columns={[
                 {
                   accessorKey: "studentId",
@@ -750,7 +754,7 @@ export default function FeePayments() {
                   header: "Created",
                   cell: (item) => (
                     <div className="text-sm text-gray-500">
-                      {format(new Date(item.createdAt), "MMM d, yyyy")}
+                      {item.createdAt ? format(new Date(item.createdAt), "MMM d, yyyy") : "-"}
                     </div>
                   )
                 },

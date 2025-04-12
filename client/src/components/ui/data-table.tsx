@@ -53,10 +53,10 @@ export function DataTable<T extends Record<string, any>>({
 
   return (
     <div className="w-full">
-      {searchKey && (
+      {(searchKey || searchFunction) && (
         <div className="flex items-center mb-4">
           <Input
-            placeholder={`Search by ${searchKey}...`}
+            placeholder={searchFunction ? "Search by student name..." : `Search by ${searchKey}...`}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="max-w-sm"
