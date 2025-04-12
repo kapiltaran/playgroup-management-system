@@ -144,9 +144,16 @@ export function StudentForm({
     try {
       // First submit student data
       const studentData = { ...values };
-      const createAccount = studentData.createAccount;
+      
+      // Extract fields that are not part of the Student schema
+      const createAccount = studentData.createAccount || false;
+      const academicYearId = studentData.academicYearId || null;
+      const classId = studentData.classId || null;
+      
       console.log("\n\n🚨🚨🚨 STUDENT FORM SUBMISSION 🚨🚨🚨");
       console.log("🔴 CRITICAL DEBUG - Form submission with createAccount:", createAccount);
+      console.log("🔴 CRITICAL DEBUG - Selected academicYearId:", academicYearId);
+      console.log("🔴 CRITICAL DEBUG - Selected classId:", classId);
       console.log("🔴 CRITICAL DEBUG - Form values:", JSON.stringify(values, null, 2));
       
       // Log form field state and errors
@@ -159,20 +166,10 @@ export function StudentForm({
         errors: form.formState.errors
       }, null, 2));
       
-      // Extract academicYearId and classId from student data
-      const academicYearId = studentData.academicYearId;
-      const classId = studentData.classId;
-      
       // Remove fields that are not part of the Student schema
-      if ('createAccount' in studentData) {
-        delete (studentData as any).createAccount;
-      }
-      if ('academicYearId' in studentData) {
-        delete (studentData as any).academicYearId;
-      }
-      if ('classId' in studentData) {
-        delete (studentData as any).classId;
-      }
+      delete (studentData as any).createAccount;
+      delete (studentData as any).academicYearId;
+      delete (studentData as any).classId;
       
       // Declare student ID variable at this level for proper scope
       let studentId: number | undefined;
