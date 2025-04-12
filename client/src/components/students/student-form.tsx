@@ -159,13 +159,19 @@ export function StudentForm({
         errors: form.formState.errors
       }, null, 2));
       
-      // Extract selected academicYearId and classId before removing createAccount
+      // Extract academicYearId and classId from student data
       const academicYearId = studentData.academicYearId;
       const classId = studentData.classId;
       
-      // Remove createAccount as it's not part of the Student schema
+      // Remove fields that are not part of the Student schema
       if ('createAccount' in studentData) {
         delete (studentData as any).createAccount;
+      }
+      if ('academicYearId' in studentData) {
+        delete (studentData as any).academicYearId;
+      }
+      if ('classId' in studentData) {
+        delete (studentData as any).classId;
       }
       
       // Declare student ID variable at this level for proper scope
@@ -607,10 +613,12 @@ export function StudentForm({
                         <Select
                           onValueChange={(value) => {
                             const numValue = parseInt(value);
-                            setSelectedAcademicYearId(numValue);
-                            field.onChange(numValue);
+                            // If "None" (0) is selected, set null
+                            const finalValue = numValue === 0 ? null : numValue;
+                            setSelectedAcademicYearId(finalValue);
+                            field.onChange(finalValue);
                           }}
-                          value={field.value?.toString() || ""}
+                          value={field.value?.toString() || "0"}
                         >
                           <FormControl>
                             <SelectTrigger>
@@ -618,7 +626,7 @@ export function StudentForm({
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            <SelectItem value="">None</SelectItem>
+                            <SelectItem value="0">None</SelectItem>
                             {academicYears?.map((year: any) => (
                               <SelectItem key={year.id} value={year.id.toString()}>
                                 {year.name} {year.isCurrent ? "(Current)" : ""}
@@ -640,9 +648,11 @@ export function StudentForm({
                         <Select
                           onValueChange={(value) => {
                             const numValue = parseInt(value);
-                            field.onChange(numValue);
+                            // If "None" (0) is selected, set null
+                            const finalValue = numValue === 0 ? null : numValue;
+                            field.onChange(finalValue);
                           }}
-                          value={field.value?.toString() || ""}
+                          value={field.value?.toString() || "0"}
                           disabled={!selectedAcademicYearId}
                         >
                           <FormControl>
@@ -651,7 +661,7 @@ export function StudentForm({
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            <SelectItem value="">None</SelectItem>
+                            <SelectItem value="0">None</SelectItem>
                             {classes?.map((cls: any) => (
                               <SelectItem key={cls.id} value={cls.id.toString()}>
                                 {cls.name}
