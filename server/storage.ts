@@ -43,6 +43,7 @@ export interface IStorage {
   createStudent(student: InsertStudent): Promise<Student>;
   updateStudent(id: number, student: Partial<InsertStudent>): Promise<Student | undefined>;
   deleteStudent(id: number): Promise<boolean>;
+  getStudentBatchAcademicYear(studentId: number): number | null;
   
   // Class methods
   getClasses(): Promise<Class[]>;
@@ -1121,13 +1122,49 @@ export class MemStorage implements IStorage {
       
       // Check if any student has this fee structure assigned but wasn't included already
       // This handles cases where a student was just assigned but wasn't caught in the first loop
+      console.log(`Checking for students with fee structure ${feeStructure.id} (${feeStructure.name})...`);
+      
+      // First check by feeStructureId in student records
       const studentsWithThisFeeStructure = allStudents.filter(
         s => s.feeStructureId === feeStructure.id && s.status === 'active'
       );
       
-      if (studentsWithThisFeeStructure.length > 0) {
-        // Use the first student we find with this fee structure
-        const student = studentsWithThisFeeStructure[0];
+      console.log(`Found ${studentsWithThisFeeStructure.length} students with feeStructureId=${feeStructure.id} directly on their record`);
+      
+      // Second way: Check if any student is in the same class and academic year as this fee structure
+      // This is especially important for newly linked students
+      const studentsInMatchingClassAndYear = allStudents.filter(s => 
+        s.status === 'active' && 
+        s.classId === feeStructure.classId && 
+        this.getStudentBatchAcademicYear(s.id) === feeStructure.academicYearId
+      );
+      
+      console.log(`Found ${studentsInMatchingClassAndYear.length} students in the same class (${feeStructure.classId}) and academic year (${feeStructure.academicYearId}) as this fee structure`);
+      
+      // Combine both sets of students, prioritizing those with direct fee structure assignments
+      const allMatchingStudents = [...studentsWithThisFeeStructure];
+      
+      // Only add students from matching class/year if they don't already have a fee structure assigned
+      // and aren't already in our list
+      for (const student of studentsInMatchingClassAndYear) {
+        if (!student.feeStructureId && !allMatchingStudents.some(s => s.id === student.id)) {
+          allMatchingStudents.push(student);
+        }
+      }
+      
+      console.log(`Combined total: ${allMatchingStudents.length} matching students for fee structure ${feeStructure.id}`);
+      
+      if (allMatchingStudents.length > 0) {
+        // Use the first student we find
+        const student = allMatchingStudents[0];
+        console.log(`Using student ${student.id} (${student.fullName}) for fee structure ${feeStructure.id}`);
+        
+        // Auto-assign fee structure to this student if it doesn't have one already
+        if (!student.feeStructureId) {
+          console.log(`Auto-assigning fee structure ${feeStructure.id} to student ${student.id} who was missing a fee structure`);
+          this.updateStudent(student.id, { feeStructureId: feeStructure.id });
+        }
+        
         result.push({
           studentId: student.id,
           studentName: student.fullName,
@@ -1143,6 +1180,7 @@ export class MemStorage implements IStorage {
         });
       } else {
         // No student assigned - show as unassigned
+        console.log(`No matching students found for fee structure ${feeStructure.id}, displaying as "Unassigned"`);
         result.push({
           studentId: null, // No student assigned yet
           studentName: "Unassigned", // Placeholder for unassigned fee structures
@@ -1876,6 +1914,7 @@ export class MemStorage implements IStorage {
     }
     
     // Create default role permissions with proper type definitions
+
     // Helper function to create properly typed role permissions
     const createPermissionConfig = (
       role: "parent" | "teacher" | "officeadmin" | "superadmin", 
