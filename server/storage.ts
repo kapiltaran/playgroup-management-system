@@ -1143,11 +1143,17 @@ export class MemStorage implements IStorage {
       
       // Second way: Check if any student is in the same class and academic year as this fee structure
       // This is especially important for newly linked students
-      const studentsInMatchingClassAndYear = allStudents.filter(s => 
-        s.status === 'active' && 
-        s.classId === feeStructure.classId && 
-        this.getStudentBatchAcademicYear(s.id) === feeStructure.academicYearId
-      );
+      const studentsInMatchingClassAndYear = allStudents.filter(s => {
+        if (s.status !== 'active' || s.classId !== feeStructure.classId) return false;
+        
+        // Get student's academic year from their batch
+        const studentAcademicYear = this.getStudentBatchAcademicYear(s.id);
+        
+        // Log detailed information for debugging
+        console.log(`Checking student ${s.id} (${s.fullName}): classId=${s.classId}, batchId=${s.batchId}, academicYear=${studentAcademicYear}, feeStructureAcademicYear=${feeStructure.academicYearId}`);
+        
+        return studentAcademicYear === feeStructure.academicYearId;
+      });
       
       console.log(`Found ${studentsInMatchingClassAndYear.length} students in the same class (${feeStructure.classId}) and academic year (${feeStructure.academicYearId}) as this fee structure`);
       
@@ -1157,7 +1163,33 @@ export class MemStorage implements IStorage {
       // Only add students from matching class/year if they don't already have a fee structure assigned
       // and aren't already in our list
       for (const student of studentsInMatchingClassAndYear) {
-        if (!student.feeStructureId && !allMatchingStudents.some(s => s.id === student.id)) {
+        // Check if the student is not already in the list
+        const alreadyInList = allMatchingStudents.some(s => s.id === student.id);
+        
+        // Check if student has no fee structure or if their fee structure is in a different academic year
+        // than their current batch (which would indicate they need to be updated)
+        let shouldAdd = false;
+        
+        if (!student.feeStructureId) {
+          // Student has no fee structure at all
+          shouldAdd = true;
+          console.log(`Student ${student.id} (${student.fullName}) has no fee structure, will be added to list`);
+        } else if (!alreadyInList) {
+          // Student has a fee structure but check if it matches their current academic year
+          const currentFeeStructure = this.feeStructures.get(student.feeStructureId);
+          if (currentFeeStructure) {
+            const studentAcademicYear = this.getStudentBatchAcademicYear(student.id);
+            
+            if (studentAcademicYear && currentFeeStructure.academicYearId !== studentAcademicYear) {
+              // Student has a fee structure but it's for a different academic year
+              console.log(`Student ${student.id} (${student.fullName}) has fee structure ${student.feeStructureId} but it's for academic year ${currentFeeStructure.academicYearId} when student is now in ${studentAcademicYear}`);
+              shouldAdd = true;
+            }
+          }
+        }
+        
+        if (shouldAdd && !alreadyInList) {
+          console.log(`Adding student ${student.id} (${student.fullName}) to matching students list`);
           allMatchingStudents.push(student);
         }
       }
