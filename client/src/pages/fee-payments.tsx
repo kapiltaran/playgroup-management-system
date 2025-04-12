@@ -42,6 +42,9 @@ export default function FeePayments() {
     feeStructureId: 0,
     paymentDate: format(new Date(), "yyyy-MM-dd"),
     amount: "",
+    discountAmount: "0",
+    miscAmount: "0",
+    totalAmount: "0", // Calculated field (amount - discount + misc)
     paymentMethod: "Cash",
     receiptNumber: "",
     notes: "",
@@ -246,6 +249,9 @@ export default function FeePayments() {
       feeStructureId: 0,
       paymentDate: format(new Date(), "yyyy-MM-dd"),
       amount: "",
+      discountAmount: "0",
+      miscAmount: "0",
+      totalAmount: "0",
       paymentMethod: "Cash",
       receiptNumber: "",
       notes: "",
@@ -274,6 +280,9 @@ export default function FeePayments() {
       feeStructureId: payment.feeStructureId,
       paymentDate: payment.paymentDate,
       amount: payment.amount,
+      discountAmount: "0", // Default to 0 for existing payments
+      miscAmount: "0", // Default to 0 for existing payments
+      totalAmount: payment.amount, // Default to the payment amount for existing records
       paymentMethod: payment.paymentMethod,
       receiptNumber: payment.receiptNumber || "",
       notes: payment.notes || "",
@@ -599,11 +608,15 @@ export default function FeePayments() {
                         size="sm"
                         onClick={() => {
                           setPaymentFormMode("add");
+                          const dueAmount = item.dueAmount.toString();
                           setPaymentFormData(prev => ({
                             ...prev,
                             studentId: item.studentId,
                             feeStructureId: item.feeStructureId,
-                            amount: item.dueAmount.toString()
+                            amount: dueAmount,
+                            discountAmount: "0",
+                            miscAmount: "0",
+                            totalAmount: dueAmount // Initialize the total amount
                           }));
                           setIsPaymentFormOpen(true);
                         }}
@@ -934,10 +947,114 @@ export default function FeePayments() {
                       step="0.01"
                       min="0"
                       value={paymentFormData.amount}
-                      onChange={handlePaymentInputChange}
+                      onChange={(e) => {
+                        const amount = e.target.value;
+                        const discountAmount = paymentFormData.discountAmount || "0";
+                        const miscAmount = paymentFormData.miscAmount || "0";
+                        
+                        // Calculate total amount: amount - discount + misc
+                        const totalAmount = (
+                          parseFloat(amount || "0") - 
+                          parseFloat(discountAmount) + 
+                          parseFloat(miscAmount)
+                        ).toFixed(2);
+                        
+                        setPaymentFormData(prev => ({
+                          ...prev,
+                          amount,
+                          totalAmount
+                        }));
+                      }}
                       className="pl-7"
                       placeholder="0.00"
                       required
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="discountAmount">Discount Amount</Label>
+                  <div className="relative">
+                    <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-500">{currencySymbol}</span>
+                    <Input
+                      id="discountAmount"
+                      name="discountAmount"
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={paymentFormData.discountAmount}
+                      onChange={(e) => {
+                        const discountAmount = e.target.value;
+                        const amount = paymentFormData.amount || "0";
+                        const miscAmount = paymentFormData.miscAmount || "0";
+                        
+                        // Calculate total amount: amount - discount + misc
+                        const totalAmount = (
+                          parseFloat(amount) - 
+                          parseFloat(discountAmount || "0") + 
+                          parseFloat(miscAmount)
+                        ).toFixed(2);
+                        
+                        setPaymentFormData(prev => ({
+                          ...prev,
+                          discountAmount,
+                          totalAmount
+                        }));
+                      }}
+                      className="pl-7"
+                      placeholder="0.00"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="miscAmount">Misc Amount</Label>
+                  <div className="relative">
+                    <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-500">{currencySymbol}</span>
+                    <Input
+                      id="miscAmount"
+                      name="miscAmount"
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={paymentFormData.miscAmount}
+                      onChange={(e) => {
+                        const miscAmount = e.target.value;
+                        const amount = paymentFormData.amount || "0";
+                        const discountAmount = paymentFormData.discountAmount || "0";
+                        
+                        // Calculate total amount: amount - discount + misc
+                        const totalAmount = (
+                          parseFloat(amount) - 
+                          parseFloat(discountAmount) + 
+                          parseFloat(miscAmount || "0")
+                        ).toFixed(2);
+                        
+                        setPaymentFormData(prev => ({
+                          ...prev,
+                          miscAmount,
+                          totalAmount
+                        }));
+                      }}
+                      className="pl-7"
+                      placeholder="0.00"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="totalAmount">Total Amount</Label>
+                  <div className="relative">
+                    <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-500">{currencySymbol}</span>
+                    <Input
+                      id="totalAmount"
+                      name="totalAmount"
+                      type="number"
+                      value={paymentFormData.totalAmount}
+                      className="pl-7 bg-gray-50"
+                      readOnly
                     />
                   </div>
                 </div>
