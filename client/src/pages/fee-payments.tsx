@@ -75,12 +75,12 @@ export default function FeePayments() {
   });
 
   // Fetch payments
-  const { data: payments, isLoading: isLoadingPayments } = useQuery<FeePayment[]>({
+  const { data: paymentsRaw, isLoading: isLoadingPayments } = useQuery<FeePayment[]>({
     queryKey: ["/api/fee-payments"],
   });
-
+  
   // Fetch reminders
-  const { data: reminders, isLoading: isLoadingReminders } = useQuery<Reminder[]>({
+  const { data: remindersRaw, isLoading: isLoadingReminders } = useQuery<Reminder[]>({
     queryKey: ["/api/reminders"],
   });
 
@@ -636,7 +636,11 @@ export default function FeePayments() {
             <DataTable
               data={payments || []}
               isLoading={isLoadingPayments}
-              searchKey="studentName"
+              searchKey="studentId"
+              searchFunction={(item, query) => {
+                const studentName = getStudentName(item.studentId).toLowerCase();
+                return studentName.includes(query.toLowerCase());
+              }}
               columns={[
                 {
                   accessorKey: "receiptNumber",

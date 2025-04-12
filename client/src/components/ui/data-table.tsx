@@ -19,6 +19,7 @@ interface DataTableProps<T> {
   }[];
   isLoading?: boolean;
   searchKey?: string;
+  searchFunction?: (item: T, query: string) => boolean;
   className?: string;
   mobileDataLabels?: boolean;
 }
@@ -28,18 +29,26 @@ export function DataTable<T extends Record<string, any>>({
   columns,
   isLoading = false,
   searchKey,
+  searchFunction,
   className,
   mobileDataLabels = true,
 }: DataTableProps<T>) {
   const [searchQuery, setSearchQuery] = useState("");
 
   // Filter data based on search query
-  const filteredData = searchKey
-    ? data.filter((item) =>
-        String(item[searchKey])
-          .toLowerCase()
-          .includes(searchQuery.toLowerCase())
-      )
+  const filteredData = searchQuery
+    ? data.filter((item) => {
+        if (searchFunction) {
+          // Use custom search function if provided
+          return searchFunction(item, searchQuery);
+        } else if (searchKey) {
+          // Use default search if only searchKey is provided
+          return String(item[searchKey])
+            .toLowerCase()
+            .includes(searchQuery.toLowerCase());
+        }
+        return true;
+      })
     : data;
 
   return (
