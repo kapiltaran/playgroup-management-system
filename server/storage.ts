@@ -1986,7 +1986,7 @@ export class MemStorage implements IStorage {
     // Helper function to create properly typed role permissions
     const createPermissionConfig = (
       role: "parent" | "teacher" | "officeadmin" | "superadmin", 
-      module: "students" | "classes" | "fee_management" | "fee_payments" | "expenses" | "inventory" | "reports" | "settings" | "user_management" | "role_management" | "attendance",
+      module: "students" | "classes" | "fee_management" | "fee_payments" | "expenses" | "inventory" | "reports" | "settings" | "user_management" | "role_management" | "attendance" | "batch_management",
       canView: boolean, 
       canCreate: boolean, 
       canEdit: boolean, 
@@ -2020,6 +2020,7 @@ export class MemStorage implements IStorage {
       createPermissionConfig('officeadmin', 'settings', true, false, true, false),
       createPermissionConfig('officeadmin', 'user_management', true, true, true, false),
       createPermissionConfig('officeadmin', 'attendance', true, true, true, true),
+      createPermissionConfig('officeadmin', 'batch_management', true, true, true, true),
     ];
     
     // Combine all permissions
