@@ -196,6 +196,7 @@ export default function LinkClasses() {
       });
       queryClient.invalidateQueries({ queryKey: ["/api/students/batch", filteredBatchId] });
       queryClient.invalidateQueries({ queryKey: ["/api/students"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/fee-reports/pending"] });
       setIsAddDialogOpen(false);
       setSelectedStudents([]);
       form.reset();
@@ -221,6 +222,7 @@ export default function LinkClasses() {
       });
       queryClient.invalidateQueries({ queryKey: ["/api/students/batch", filteredBatchId] });
       queryClient.invalidateQueries({ queryKey: ["/api/students"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/fee-reports/pending"] });
       setStudentToDelete(null);
     },
     onError: (error) => {
