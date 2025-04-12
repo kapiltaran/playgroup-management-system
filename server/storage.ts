@@ -1223,29 +1223,69 @@ export class MemStorage implements IStorage {
       console.log(`Combined total: ${allMatchingStudents.length} matching students for fee structure ${feeStructure.id}`);
       
       if (allMatchingStudents.length > 0) {
-        // Use the first student we find
-        const student = allMatchingStudents[0];
-        console.log(`Using student ${student.id} (${student.fullName}) for fee structure ${feeStructure.id}`);
-        
-        // Auto-assign fee structure to this student if it doesn't have one already
-        if (!student.feeStructureId) {
-          console.log(`Auto-assigning fee structure ${feeStructure.id} to student ${student.id} who was missing a fee structure`);
-          this.updateStudent(student.id, { feeStructureId: feeStructure.id });
+        // For each matching student, create a pending fee entry
+        for (const student of allMatchingStudents) {
+          console.log(`Processing student ${student.id} (${student.fullName}) for fee structure ${feeStructure.id}`);
+          
+          // Get payments for this student and fee structure
+          const studentPayments = Array.from(this.feePayments.values())
+            .filter(payment => 
+              payment.studentId === student.id && 
+              payment.feeStructureId === feeStructure.id
+            );
+          
+          // Calculate student-specific paid amount
+          const studentPaidAmount = studentPayments.reduce((sum, payment) => {
+            return sum + parseFloat(payment.amount.toString());
+          }, 0);
+          
+          // Calculate student-specific due amount
+          const studentDueAmount = parseFloat(feeStructure.totalAmount.toString()) - studentPaidAmount;
+          
+          // Skip if this student has fully paid this fee structure
+          if (studentDueAmount <= 0) {
+            console.log(`Student ${student.id} (${student.fullName}) has fully paid fee structure ${feeStructure.id}, skipping...`);
+            continue;
+          }
+          
+          // Auto-assign fee structure to this student if it doesn't have one already and this is the first fee structure we find
+          if (!student.feeStructureId) {
+            console.log(`Auto-assigning fee structure ${feeStructure.id} to student ${student.id} who was missing a fee structure`);
+            this.updateStudent(student.id, { feeStructureId: feeStructure.id });
+          }
+          
+          // Determine the status based on payments and due date
+          let status = 'upcoming';
+          
+          // Check if there are any payments made already
+          const hasPartialPayment = studentPaidAmount > 0;
+          
+          // Check if the due date is in the past
+          const isDueDatePast = feeStructure.dueDate && new Date(feeStructure.dueDate) < new Date();
+          
+          // If due date is past and no payments have been made, it's overdue
+          // If due date is past but some payments have been made, it's partially paid but still overdue
+          if (isDueDatePast) {
+            status = hasPartialPayment ? 'partial-overdue' : 'overdue';
+          } else {
+            // If due date is not past, but some payments have been made
+            status = hasPartialPayment ? 'partial-paid' : 'upcoming';
+          }
+          
+          result.push({
+            studentId: student.id,
+            studentName: student.fullName,
+            classId: student.classId,
+            className: student.classId ? (this.classes.get(student.classId)?.name || 'Unknown') : 'Not Assigned',
+            feeStructureId: feeStructure.id,
+            feeName: feeStructure.name,
+            dueDate: feeStructure.dueDate,
+            totalAmount: feeStructure.totalAmount,
+            paidAmount: studentPaidAmount,
+            dueAmount: studentDueAmount,
+            status
+          });
         }
-        
-        result.push({
-          studentId: student.id,
-          studentName: student.fullName,
-          classId: student.classId,
-          className: student.classId ? (this.classes.get(student.classId)?.name || 'Unknown') : 'Not Assigned',
-          feeStructureId: feeStructure.id,
-          feeName: feeStructure.name,
-          dueDate: feeStructure.dueDate,
-          totalAmount: feeStructure.totalAmount,
-          paidAmount: totalPaid, // Use the calculated total paid amount
-          dueAmount,
-          status: feeStructure.dueDate && new Date(feeStructure.dueDate) < new Date() ? 'overdue' : 'upcoming'
-        });
       } else {
         // No student assigned - show as unassigned
         console.log(`No matching students found for fee structure ${feeStructure.id}, displaying as "Unassigned"`);
