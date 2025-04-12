@@ -513,6 +513,7 @@ export default function FeePayments() {
             <DataTable
               data={pendingFees || []}
               isLoading={isLoadingPendingFees}
+              searchKey="studentName"
               columns={[
                 {
                   accessorKey: "studentName",
@@ -635,7 +636,7 @@ export default function FeePayments() {
             <DataTable
               data={payments || []}
               isLoading={isLoadingPayments}
-              searchKey="receiptNumber"
+              searchKey="studentName"
               columns={[
                 {
                   accessorKey: "receiptNumber",
@@ -724,6 +725,7 @@ export default function FeePayments() {
             <DataTable
               data={reminders || []}
               isLoading={isLoadingReminders}
+              searchKey="studentName"
               columns={[
                 {
                   accessorKey: "studentId",
