@@ -859,9 +859,19 @@ export default function FeePayments() {
                     <SelectValue placeholder="Select a fee structure" />
                   </SelectTrigger>
                   <SelectContent>
-                    {pendingFees?.map((fee) => (
+                    {/* Use a Set to filter out duplicate fee structures */}
+                    {pendingFees?.reduce((unique, fee) => {
+                      // Use both feeStructureId and feeName to create a unique key
+                      const key = `${fee.feeStructureId}-${fee.feeName}`;
+                      
+                      // Check if we've already added this fee structure
+                      if (!unique.some(item => `${item.feeStructureId}-${item.feeName}` === key)) {
+                        unique.push(fee);
+                      }
+                      return unique;
+                    }, [] as any[]).map((fee) => (
                       <SelectItem 
-                        key={`${fee.feeStructureId}-${fee.studentId || 'unassigned'}`} 
+                        key={`fee-${fee.feeStructureId}`}
                         value={fee.feeStructureId.toString()}
                       >
                         {fee.feeName} - {formatCurrency(parseFloat(fee.dueAmount))}
@@ -1060,15 +1070,27 @@ export default function FeePayments() {
                     <SelectValue placeholder="Select a fee structure" />
                   </SelectTrigger>
                   <SelectContent>
-                    {pendingFees?.map((fee) => (
-                      <SelectItem 
-                        key={`${fee.studentId}-${fee.feeStructureId}`} 
-                        value={fee.feeStructureId.toString()}
-                        disabled={fee.studentId !== reminderFormData.studentId}
-                      >
-                        {fee.feeName} - {formatCurrency(parseFloat(fee.dueAmount))} ({fee.status})
-                      </SelectItem>
-                    ))}
+                    {/* Filter fees for the selected student and eliminate duplicates */}
+                    {pendingFees?.filter(fee => fee.studentId === reminderFormData.studentId)
+                      .reduce((unique, fee) => {
+                        // Use both feeStructureId and feeName to create a unique key
+                        const key = `${fee.feeStructureId}-${fee.feeName}`;
+                        
+                        // Check if we've already added this fee structure
+                        if (!unique.some(item => `${item.feeStructureId}-${item.feeName}` === key)) {
+                          unique.push(fee);
+                        }
+                        return unique;
+                      }, [] as any[])
+                      .map((fee) => (
+                        <SelectItem 
+                          key={`reminder-fee-${fee.feeStructureId}`}
+                          value={fee.feeStructureId.toString()}
+                        >
+                          {fee.feeName} - {formatCurrency(parseFloat(fee.dueAmount))} ({fee.status})
+                        </SelectItem>
+                      ))
+                    }
                   </SelectContent>
                 </Select>
               </div>
