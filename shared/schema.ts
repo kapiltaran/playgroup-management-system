@@ -329,6 +329,19 @@ export const insertAttendanceSchema = createInsertSchema(attendance).omit({
   updatedAt: true,
 });
 
+// Receipt Number Sequence schema for tracking next available receipt number
+export const receiptNumberSequence = pgTable("receipt_number_sequence", {
+  id: serial("id").primaryKey(),
+  nextValue: integer("next_value").notNull().default(1),
+  prefix: text("prefix").notNull().default("RC-"),
+  lastUpdated: timestamp("last_updated").defaultNow(),
+});
+
+export const insertReceiptNumberSequenceSchema = createInsertSchema(receiptNumberSequence).omit({
+  id: true,
+  lastUpdated: true,
+});
+
 // Type definitions for TypeScript
 export type Student = typeof students.$inferSelect;
 export type InsertStudent = z.infer<typeof insertStudentSchema>;
@@ -360,3 +373,5 @@ export type AcademicYear = typeof academicYears.$inferSelect;
 export type InsertAcademicYear = z.infer<typeof insertAcademicYearSchema>;
 export type Batch = typeof batches.$inferSelect;
 export type InsertBatch = z.infer<typeof insertBatchSchema>;
+export type ReceiptNumberSequence = typeof receiptNumberSequence.$inferSelect;
+export type InsertReceiptNumberSequence = z.infer<typeof insertReceiptNumberSequenceSchema>;

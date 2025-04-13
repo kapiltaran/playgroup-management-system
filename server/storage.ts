@@ -35,6 +35,9 @@ import {
 
 // Storage interface
 export interface IStorage {
+  // Receipt number sequence methods
+  getNextReceiptNumber(): Promise<string>;
+  
   // Student methods
   getStudents(userId?: number): Promise<Student[]>;
   getStudentsByClass(classId: number): Promise<Student[]>;
