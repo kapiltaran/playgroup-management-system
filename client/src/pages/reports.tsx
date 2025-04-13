@@ -640,10 +640,10 @@ export default function Reports() {
         
         <TabsContent value="fees">
           <div className="mb-6">
-            <Tabs defaultValue="pending">
+            <Tabs defaultValue="daily">
               <TabsList>
-                <TabsTrigger value="pending">Class-wise Pending Fees</TabsTrigger>
                 <TabsTrigger value="daily">Daily Petty Cash Report</TabsTrigger>
+                <TabsTrigger value="pending">Class-wise Pending Fees</TabsTrigger>
                 <TabsTrigger value="monthly">Monthly Collections</TabsTrigger>
               </TabsList>
               
