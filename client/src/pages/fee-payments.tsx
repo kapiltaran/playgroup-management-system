@@ -31,7 +31,7 @@ const PAYMENT_METHODS = [
 export default function FeePayments() {
   const { toast } = useToast();
   const { currencySymbol, formatCurrency } = useCurrency();
-  const [activeTab, setActiveTab] = useState("payments");
+  const [activeTab, setActiveTab] = useState("pending");
   
   // Payment state
   const [isPaymentFormOpen, setIsPaymentFormOpen] = useState(false);
