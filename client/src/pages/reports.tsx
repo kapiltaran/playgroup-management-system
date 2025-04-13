@@ -55,6 +55,9 @@ export default function Reports() {
   const { toast } = useToast();
   const [timeRange, setTimeRange] = useState("all");
   const [activeTab, setActiveTab] = useState("expenses");
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
+  const [selectedMonth, setSelectedMonth] = useState<string>(format(new Date(), 'yyyy-MM'));
+  const [selectedClass, setSelectedClass] = useState<string>("0");
 
   // Fetch expense data
   const { data: expenses, isLoading: isLoadingExpenses } = useQuery<Expense[]>({
@@ -74,6 +77,55 @@ export default function Reports() {
   // Fetch expense report data
   const { data: expenseReportData } = useQuery<any[]>({
     queryKey: ["/api/reports/expenses"],
+  });
+  
+  // Fetch class data for fee reports
+  const { data: classes, isLoading: isLoadingClasses } = useQuery({
+    queryKey: ["/api/classes"],
+  });
+  
+  // Fetch fee report data - pending fees
+  const { data: pendingFeeData, isLoading: isLoadingPendingFees } = useQuery<any[]>({
+    queryKey: ["/api/fee-reports/pending", { classId: selectedClass }],
+    queryFn: async () => {
+      const queryParams = new URLSearchParams();
+      if (selectedClass !== "0") {
+        queryParams.append("classId", selectedClass);
+      }
+      const response = await fetch(`/api/fee-reports/pending?${queryParams}`);
+      return response.json();
+    },
+    enabled: activeTab === "fees",
+  });
+  
+  // Fetch fee report data - daily collections
+  const { data: dailyFeeData, isLoading: isLoadingDailyFees } = useQuery<any[]>({
+    queryKey: ["/api/fee-reports/daily", { date: selectedDate ? format(selectedDate, 'yyyy-MM-dd') : null }],
+    queryFn: async () => {
+      if (!selectedDate) return [];
+      const queryParams = new URLSearchParams({ 
+        date: format(selectedDate, 'yyyy-MM-dd')
+      });
+      const response = await fetch(`/api/fee-reports/daily?${queryParams}`);
+      return response.json();
+    },
+    enabled: activeTab === "fees" && !!selectedDate,
+  });
+  
+  // Fetch fee report data - monthly collections
+  const { data: monthlyFeeData, isLoading: isLoadingMonthlyFees } = useQuery<any[]>({
+    queryKey: ["/api/fee-reports/monthly", { month: selectedMonth }],
+    queryFn: async () => {
+      if (!selectedMonth) return [];
+      const [year, month] = selectedMonth.split('-');
+      const queryParams = new URLSearchParams({ 
+        year, 
+        month
+      });
+      const response = await fetch(`/api/fee-reports/monthly?${queryParams}`);
+      return response.json();
+    },
+    enabled: activeTab === "fees" && !!selectedMonth,
   });
 
   // Process expense data for charts
@@ -300,7 +352,7 @@ export default function Reports() {
             <UsersIcon className="h-4 w-4" /> Students
           </TabsTrigger>
           <TabsTrigger value="fees" className="flex items-center gap-2">
-            <BanknotesIcon className="h-4 w-4" /> Fees
+            <BanknoteIcon className="h-4 w-4" /> Fees
           </TabsTrigger>
         </TabsList>
         
@@ -555,6 +607,290 @@ export default function Reports() {
                 </div>
               </CardContent>
             </Card>
+          </div>
+        </TabsContent>
+        
+        <TabsContent value="fees">
+          <div className="mb-6">
+            <Tabs defaultValue="pending">
+              <TabsList>
+                <TabsTrigger value="pending">Class-wise Pending Fees</TabsTrigger>
+                <TabsTrigger value="daily">Daily Petty Cash Report</TabsTrigger>
+                <TabsTrigger value="monthly">Monthly Collections</TabsTrigger>
+              </TabsList>
+              
+              <TabsContent value="pending">
+                <div className="mb-4 mt-4">
+                  <div className="flex items-center gap-4">
+                    <div className="flex-1">
+                      <Label htmlFor="class-select" className="mb-2 block">Select Class</Label>
+                      <Select
+                        value={selectedClass}
+                        onValueChange={setSelectedClass}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select a class" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="0">All Classes</SelectItem>
+                          {classes?.map((cls: any) => (
+                            <SelectItem key={cls.id} value={cls.id.toString()}>
+                              {cls.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="flex-1"></div>
+                  </div>
+                </div>
+                
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Pending Fee Reports</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {isLoadingPendingFees ? (
+                      <div className="py-8 text-center">
+                        <p>Loading pending fee data...</p>
+                      </div>
+                    ) : !pendingFeeData?.length ? (
+                      <div className="py-8 text-center">
+                        <p>No pending fees found</p>
+                      </div>
+                    ) : (
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                          <thead>
+                            <tr className="border-b">
+                              <th className="py-3 px-4 text-left font-medium">Student</th>
+                              <th className="py-3 px-4 text-left font-medium">Fee Structure</th>
+                              <th className="py-3 px-4 text-left font-medium">Total Amount</th>
+                              <th className="py-3 px-4 text-left font-medium">Paid Amount</th>
+                              <th className="py-3 px-4 text-left font-medium">Due Amount</th>
+                              <th className="py-3 px-4 text-left font-medium">Due Date</th>
+                              <th className="py-3 px-4 text-left font-medium">Status</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {pendingFeeData.map((fee: any, index: number) => (
+                              <tr key={index} className={index % 2 === 0 ? 'bg-gray-50' : ''}>
+                                <td className="py-3 px-4">{fee.studentName || 'Unassigned'}</td>
+                                <td className="py-3 px-4">{fee.feeStructureName}</td>
+                                <td className="py-3 px-4">${parseFloat(fee.totalAmount).toFixed(2)}</td>
+                                <td className="py-3 px-4">${parseFloat(fee.paidAmount).toFixed(2)}</td>
+                                <td className="py-3 px-4">${parseFloat(fee.dueAmount).toFixed(2)}</td>
+                                <td className="py-3 px-4">{fee.dueDate ? format(new Date(fee.dueDate), 'MMM dd, yyyy') : '-'}</td>
+                                <td className="py-3 px-4">
+                                  <span 
+                                    className={`px-2 py-1 rounded-full text-xs ${
+                                      fee.status === 'overdue' ? 'bg-red-100 text-red-800' : 
+                                      fee.status === 'partial-overdue' ? 'bg-amber-100 text-amber-800' :
+                                      fee.status === 'partial-paid' ? 'bg-blue-100 text-blue-800' :
+                                      'bg-gray-100 text-gray-800'
+                                    }`}
+                                  >
+                                    {fee.status}
+                                  </span>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </TabsContent>
+              
+              <TabsContent value="daily">
+                <div className="mb-4 mt-4">
+                  <div className="flex items-end gap-4">
+                    <div className="flex-1">
+                      <Label htmlFor="date-select" className="mb-2 block">Select Date</Label>
+                      <DatePicker date={selectedDate} setDate={setSelectedDate} />
+                    </div>
+                    <div className="flex-1"></div>
+                  </div>
+                </div>
+                
+                <Card>
+                  <CardHeader>
+                    <CardTitle>
+                      Daily Petty Cash Report - {selectedDate ? format(selectedDate, 'MMMM dd, yyyy') : 'Select a date'}
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {isLoadingDailyFees ? (
+                      <div className="py-8 text-center">
+                        <p>Loading daily fee data...</p>
+                      </div>
+                    ) : !dailyFeeData?.length ? (
+                      <div className="py-8 text-center">
+                        <p>No fee collections found for selected date</p>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-sm">
+                            <thead>
+                              <tr className="border-b">
+                                <th className="py-3 px-4 text-left font-medium">Receipt #</th>
+                                <th className="py-3 px-4 text-left font-medium">Student</th>
+                                <th className="py-3 px-4 text-left font-medium">Fee Structure</th>
+                                <th className="py-3 px-4 text-left font-medium">Amount</th>
+                                <th className="py-3 px-4 text-left font-medium">Payment Method</th>
+                                <th className="py-3 px-4 text-left font-medium">Time</th>
+                                <th className="py-3 px-4 text-left font-medium">Notes</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {dailyFeeData.map((payment: any, index: number) => (
+                                <tr key={payment.id} className={index % 2 === 0 ? 'bg-gray-50' : ''}>
+                                  <td className="py-3 px-4">{payment.id}</td>
+                                  <td className="py-3 px-4">{payment.studentName}</td>
+                                  <td className="py-3 px-4">{payment.feeStructureName}</td>
+                                  <td className="py-3 px-4">${parseFloat(payment.amount).toFixed(2)}</td>
+                                  <td className="py-3 px-4">{payment.paymentMethod}</td>
+                                  <td className="py-3 px-4">{format(new Date(payment.paymentDate), 'h:mm a')}</td>
+                                  <td className="py-3 px-4">{payment.notes || '-'}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                        
+                        <div className="mt-6 p-4 bg-gray-50 rounded-md">
+                          <h3 className="text-lg font-semibold mb-2">Daily Summary</h3>
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div>
+                              <p className="text-sm text-gray-500">Total Collections</p>
+                              <p className="text-2xl font-bold text-gray-900">
+                                ${dailyFeeData.reduce((sum: number, payment: any) => sum + parseFloat(payment.amount), 0).toFixed(2)}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-sm text-gray-500">Number of Receipts</p>
+                              <p className="text-2xl font-bold text-gray-900">
+                                {dailyFeeData.length}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-sm text-gray-500">Average Receipt Amount</p>
+                              <p className="text-2xl font-bold text-gray-900">
+                                ${(dailyFeeData.reduce((sum: number, payment: any) => sum + parseFloat(payment.amount), 0) / dailyFeeData.length).toFixed(2)}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      </>
+                    )}
+                  </CardContent>
+                </Card>
+              </TabsContent>
+              
+              <TabsContent value="monthly">
+                <div className="mb-4 mt-4">
+                  <div className="flex items-end gap-4">
+                    <div className="flex-1">
+                      <Label htmlFor="month-select" className="mb-2 block">Select Month</Label>
+                      <Input 
+                        type="month" 
+                        id="month-select"
+                        value={selectedMonth}
+                        onChange={(e) => setSelectedMonth(e.target.value)}
+                        className="w-full"
+                      />
+                    </div>
+                    <div className="flex-1"></div>
+                  </div>
+                </div>
+                
+                <Card>
+                  <CardHeader>
+                    <CardTitle>
+                      Monthly Fee Collections - {selectedMonth ? format(new Date(selectedMonth + "-01"), 'MMMM yyyy') : 'Select a month'}
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {isLoadingMonthlyFees ? (
+                      <div className="py-8 text-center">
+                        <p>Loading monthly fee data...</p>
+                      </div>
+                    ) : !monthlyFeeData?.length ? (
+                      <div className="py-8 text-center">
+                        <p>No fee collections found for selected month</p>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="mb-6">
+                          <div className="h-80">
+                            <ResponsiveContainer width="100%" height="100%">
+                              <LineChart
+                                data={(() => {
+                                  // Group by day
+                                  const dailyCollections: Record<string, number> = {};
+                                  monthlyFeeData.forEach((payment: any) => {
+                                    const date = format(new Date(payment.paymentDate), 'dd');
+                                    const amount = parseFloat(payment.amount);
+                                    dailyCollections[date] = (dailyCollections[date] || 0) + amount;
+                                  });
+                                  
+                                  // Convert to array
+                                  return Object.entries(dailyCollections)
+                                    .map(([day, amount]) => ({
+                                      day: parseInt(day),
+                                      amount
+                                    }))
+                                    .sort((a, b) => a.day - b.day);
+                                })()}
+                                margin={{ top: 20, right: 30, left: 20, bottom: 10 }}
+                              >
+                                <CartesianGrid strokeDasharray="3 3" />
+                                <XAxis 
+                                  dataKey="day" 
+                                  label={{ value: 'Day of Month', position: 'insideBottomRight', offset: -10 }}
+                                />
+                                <YAxis 
+                                  tickFormatter={(value) => `$${value}`}
+                                  label={{ value: 'Amount Collected', angle: -90, position: 'insideLeft' }}
+                                />
+                                <Tooltip formatter={(value) => [`$${value}`, 'Amount']} />
+                                <Line type="monotone" dataKey="amount" stroke="#4F46E5" strokeWidth={2} />
+                              </LineChart>
+                            </ResponsiveContainer>
+                          </div>
+                        </div>
+                        
+                        <div className="mt-6 p-4 bg-gray-50 rounded-md">
+                          <h3 className="text-lg font-semibold mb-2">Monthly Summary</h3>
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div>
+                              <p className="text-sm text-gray-500">Total Collections</p>
+                              <p className="text-2xl font-bold text-gray-900">
+                                ${monthlyFeeData.reduce((sum: number, payment: any) => sum + parseFloat(payment.amount), 0).toFixed(2)}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-sm text-gray-500">Number of Receipts</p>
+                              <p className="text-2xl font-bold text-gray-900">
+                                {monthlyFeeData.length}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-sm text-gray-500">Average Receipt Amount</p>
+                              <p className="text-2xl font-bold text-gray-900">
+                                ${(monthlyFeeData.reduce((sum: number, payment: any) => sum + parseFloat(payment.amount), 0) / monthlyFeeData.length).toFixed(2)}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      </>
+                    )}
+                  </CardContent>
+                </Card>
+              </TabsContent>
+            </Tabs>
           </div>
         </TabsContent>
         
