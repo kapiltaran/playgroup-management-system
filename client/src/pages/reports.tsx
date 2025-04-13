@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { format } from "date-fns";
+import { format, subDays, startOfMonth, endOfMonth } from "date-fns";
 import { 
   BarChart, 
   Bar, 
@@ -12,20 +12,28 @@ import {
   CartesianGrid, 
   Tooltip, 
   Legend, 
-  ResponsiveContainer 
+  ResponsiveContainer,
+  LineChart,
+  Line
 } from "recharts";
 import { 
   BarChart3Icon, 
   DownloadIcon,
   UsersIcon,
   DollarSignIcon,
-  PackageIcon
+  PackageIcon,
+  BanknoteIcon,
+  CalendarIcon,
+  ReceiptText
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { DatePicker } from "@/components/ui/date-picker";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 import type { Student, Expense, Inventory } from "@shared/schema";
 
@@ -290,6 +298,9 @@ export default function Reports() {
           </TabsTrigger>
           <TabsTrigger value="students" className="flex items-center gap-2">
             <UsersIcon className="h-4 w-4" /> Students
+          </TabsTrigger>
+          <TabsTrigger value="fees" className="flex items-center gap-2">
+            <BanknotesIcon className="h-4 w-4" /> Fees
           </TabsTrigger>
         </TabsList>
         
