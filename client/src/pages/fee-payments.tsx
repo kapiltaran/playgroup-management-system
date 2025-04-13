@@ -94,6 +94,8 @@ export default function FeePayments() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/fee-payments"] });
       queryClient.invalidateQueries({ queryKey: ["/api/fee-reports/pending"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/fee-reports/daily"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/fee-reports/monthly"] });
       queryClient.invalidateQueries({ queryKey: ["/api/activities"] });
       toast({
         title: "Success",
@@ -118,6 +120,8 @@ export default function FeePayments() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/fee-payments"] });
       queryClient.invalidateQueries({ queryKey: ["/api/fee-reports/pending"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/fee-reports/daily"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/fee-reports/monthly"] });
       toast({
         title: "Success",
         description: "Payment updated successfully",
@@ -141,6 +145,8 @@ export default function FeePayments() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/fee-payments"] });
       queryClient.invalidateQueries({ queryKey: ["/api/fee-reports/pending"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/fee-reports/daily"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/fee-reports/monthly"] });
       toast({
         title: "Success",
         description: "Payment deleted successfully",

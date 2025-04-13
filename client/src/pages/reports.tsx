@@ -54,7 +54,7 @@ const CHART_COLORS = [
 export default function Reports() {
   const { toast } = useToast();
   const [timeRange, setTimeRange] = useState("all");
-  const [activeTab, setActiveTab] = useState("expenses");
+  const [activeTab, setActiveTab] = useState("fees");
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
   const [selectedMonth, setSelectedMonth] = useState<string>(format(new Date(), 'yyyy-MM'));
   const [selectedClass, setSelectedClass] = useState<string>("0");
