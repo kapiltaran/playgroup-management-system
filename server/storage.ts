@@ -206,6 +206,7 @@ export class MemStorage implements IStorage {
   private attendance: Map<number, Attendance>;
   private academicYears: Map<number, AcademicYear>;
   private batches: Map<number, Batch>;
+  private nextReceiptNumber: number;
   
   private studentId: number;
   private expenseId: number;
@@ -256,6 +257,7 @@ export class MemStorage implements IStorage {
     this.attendanceId = 1;
     this.academicYearId = 1;
     this.batchId = 1;
+    this.nextReceiptNumber = 1;
     
     // Initialize with sample data asynchronously
     setTimeout(() => {
@@ -865,7 +867,17 @@ export class MemStorage implements IStorage {
     return this.feePayments.get(id);
   }
 
+  async getNextReceiptNumber(): Promise<string> {
+    const receiptNumber = `RC-${this.nextReceiptNumber.toString().padStart(3, '0')}`;
+    this.nextReceiptNumber++; // Increment for next use
+    return receiptNumber;
+  }
+
   async createFeePayment(payment: InsertFeePayment): Promise<FeePayment> {
+    // Auto-generate receipt number if not provided
+    if (!payment.receiptNumber) {
+      payment.receiptNumber = await this.getNextReceiptNumber();
+    }
     const id = this.feePaymentId++;
     const now = new Date();
     const newPayment: FeePayment = { 
