@@ -580,6 +580,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: "Failed to export inventory" });
     }
   });
+  
+  app.get("/api/export/fees", async (req: Request, res: Response) => {
+    try {
+      const user = (req.session as any).user;
+      if (!user) {
+        return res.status(401).json({ message: "Authentication required" });
+      }
+      
+      // Get the date from query parameter if provided
+      const date = req.query.date as string;
+      
+      let feeData;
+      
+      if (date) {
+        // If date is provided, get daily fee report data
+        const dailyFeeReport = await storage.getDailyFeeReport(date);
+        feeData = dailyFeeReport.paymentDetails;
+      } else {
+        // If no date, get all pending fees
+        feeData = await storage.getPendingFees();
+      }
+      
+      res.json(feeData);
+    } catch (error) {
+      console.error("Error exporting fee data:", error);
+      res.status(500).json({ message: "Failed to export fee data" });
+    }
+  });
 
   // Fee Management API Routes
   

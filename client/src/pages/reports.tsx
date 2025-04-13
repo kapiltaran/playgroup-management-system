@@ -24,7 +24,8 @@ import {
   PackageIcon,
   BanknoteIcon,
   CalendarIcon,
-  ReceiptText
+  ReceiptText,
+  Download
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
@@ -718,7 +719,26 @@ export default function Reports() {
                       <Label htmlFor="date-select" className="mb-2 block">Select Date</Label>
                       <DatePicker date={selectedDate} setDate={setSelectedDate} />
                     </div>
-                    <div className="flex-1"></div>
+                    <div className="flex-1 text-right">
+                      <Button 
+                        variant="outline" 
+                        className="mt-4"
+                        onClick={() => {
+                          if (!selectedDate) {
+                            toast({
+                              title: "Error",
+                              description: "Please select a date first",
+                              variant: "destructive"
+                            });
+                            return;
+                          }
+                          window.location.href = `/api/export/fees?date=${format(selectedDate, 'yyyy-MM-dd')}`;
+                        }}
+                      >
+                        <Download className="mr-2 h-4 w-4" />
+                        Export Fees
+                      </Button>
+                    </div>
                   </div>
                 </div>
                 
