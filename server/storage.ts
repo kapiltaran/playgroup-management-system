@@ -30,8 +30,13 @@ import {
   type AcademicYear,
   type InsertAcademicYear,
   type Batch,
-  type InsertBatch
+  type InsertBatch,
+  type ReceiptNumberSequence,
+  users,
+  receiptNumberSequence
 } from "@shared/schema";
+import { db } from "./db";
+import { eq } from "drizzle-orm";
 
 // Storage interface
 export interface IStorage {
