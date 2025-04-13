@@ -31,7 +31,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { DatePicker } from "@/components/ui/date-picker";
+import { DatePicker } from "../components/ui/date-picker";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
@@ -80,7 +80,7 @@ export default function Reports() {
   });
   
   // Fetch class data for fee reports
-  const { data: classes, isLoading: isLoadingClasses } = useQuery({
+  const { data: classes, isLoading: isLoadingClasses } = useQuery<any[]>({
     queryKey: ["/api/classes"],
   });
   
@@ -99,10 +99,10 @@ export default function Reports() {
   });
   
   // Fetch fee report data - daily collections
-  const { data: dailyFeeData, isLoading: isLoadingDailyFees } = useQuery<any[]>({
+  const { data: dailyFeeReportData, isLoading: isLoadingDailyFees } = useQuery<any>({
     queryKey: ["/api/fee-reports/daily", { date: selectedDate ? format(selectedDate, 'yyyy-MM-dd') : null }],
     queryFn: async () => {
-      if (!selectedDate) return [];
+      if (!selectedDate) return { paymentDetails: [], totalCollected: 0 };
       const queryParams = new URLSearchParams({ 
         date: format(selectedDate, 'yyyy-MM-dd')
       });
@@ -112,11 +112,15 @@ export default function Reports() {
     enabled: activeTab === "fees" && !!selectedDate,
   });
   
+  // Extract the payment details from the daily fee report data
+  const dailyFeeData = dailyFeeReportData?.paymentDetails || [];
+  const dailyTotalCollected = dailyFeeReportData?.totalCollected || 0;
+  
   // Fetch fee report data - monthly collections
-  const { data: monthlyFeeData, isLoading: isLoadingMonthlyFees } = useQuery<any[]>({
+  const { data: monthlyFeeReportData, isLoading: isLoadingMonthlyFees } = useQuery<any>({
     queryKey: ["/api/fee-reports/monthly", { month: selectedMonth }],
     queryFn: async () => {
-      if (!selectedMonth) return [];
+      if (!selectedMonth) return { dailyCollection: [], totalCollected: 0 };
       const [year, month] = selectedMonth.split('-');
       const queryParams = new URLSearchParams({ 
         year, 
@@ -127,6 +131,10 @@ export default function Reports() {
     },
     enabled: activeTab === "fees" && !!selectedMonth,
   });
+  
+  // Extract the daily collections from the monthly fee report data
+  const monthlyDailyCollections = monthlyFeeReportData?.dailyCollection || [];
+  const monthlyTotalCollected = monthlyFeeReportData?.totalCollected || 0;
 
   // Process expense data for charts
   const getExpenseChartData = () => {
@@ -340,8 +348,11 @@ export default function Reports() {
         </div>
       </div>
 
-      <Tabs defaultValue="expenses" value={activeTab} onValueChange={setActiveTab}>
+      <Tabs defaultValue="fees" value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="mb-6">
+          <TabsTrigger value="fees" className="flex items-center gap-2">
+            <BanknoteIcon className="h-4 w-4" /> Fees
+          </TabsTrigger>
           <TabsTrigger value="expenses" className="flex items-center gap-2">
             <DollarSignIcon className="h-4 w-4" /> Expenses
           </TabsTrigger>
@@ -350,9 +361,6 @@ export default function Reports() {
           </TabsTrigger>
           <TabsTrigger value="students" className="flex items-center gap-2">
             <UsersIcon className="h-4 w-4" /> Students
-          </TabsTrigger>
-          <TabsTrigger value="fees" className="flex items-center gap-2">
-            <BanknoteIcon className="h-4 w-4" /> Fees
           </TabsTrigger>
         </TabsList>
         
@@ -766,7 +774,7 @@ export default function Reports() {
                             <div>
                               <p className="text-sm text-gray-500">Total Collections</p>
                               <p className="text-2xl font-bold text-gray-900">
-                                ${dailyFeeData.reduce((sum: number, payment: any) => sum + parseFloat(payment.amount), 0).toFixed(2)}
+                                ${parseFloat(dailyTotalCollected.toString()).toFixed(2)}
                               </p>
                             </div>
                             <div>
@@ -778,7 +786,7 @@ export default function Reports() {
                             <div>
                               <p className="text-sm text-gray-500">Average Receipt Amount</p>
                               <p className="text-2xl font-bold text-gray-900">
-                                ${(dailyFeeData.reduce((sum: number, payment: any) => sum + parseFloat(payment.amount), 0) / dailyFeeData.length).toFixed(2)}
+                                ${dailyFeeData.length ? (dailyTotalCollected / dailyFeeData.length).toFixed(2) : "0.00"}
                               </p>
                             </div>
                           </div>
@@ -817,7 +825,7 @@ export default function Reports() {
                       <div className="py-8 text-center">
                         <p>Loading monthly fee data...</p>
                       </div>
-                    ) : !monthlyFeeData?.length ? (
+                    ) : !monthlyDailyCollections?.length ? (
                       <div className="py-8 text-center">
                         <p>No fee collections found for selected month</p>
                       </div>
@@ -827,23 +835,10 @@ export default function Reports() {
                           <div className="h-80">
                             <ResponsiveContainer width="100%" height="100%">
                               <LineChart
-                                data={(() => {
-                                  // Group by day
-                                  const dailyCollections: Record<string, number> = {};
-                                  monthlyFeeData.forEach((payment: any) => {
-                                    const date = format(new Date(payment.paymentDate), 'dd');
-                                    const amount = parseFloat(payment.amount);
-                                    dailyCollections[date] = (dailyCollections[date] || 0) + amount;
-                                  });
-                                  
-                                  // Convert to array
-                                  return Object.entries(dailyCollections)
-                                    .map(([day, amount]) => ({
-                                      day: parseInt(day),
-                                      amount
-                                    }))
-                                    .sort((a, b) => a.day - b.day);
-                                })()}
+                                data={monthlyDailyCollections.map((item: any) => ({
+                                  day: item.day,
+                                  amount: item.amount
+                                }))}
                                 margin={{ top: 20, right: 30, left: 20, bottom: 10 }}
                               >
                                 <CartesianGrid strokeDasharray="3 3" />
@@ -868,19 +863,19 @@ export default function Reports() {
                             <div>
                               <p className="text-sm text-gray-500">Total Collections</p>
                               <p className="text-2xl font-bold text-gray-900">
-                                ${monthlyFeeData.reduce((sum: number, payment: any) => sum + parseFloat(payment.amount), 0).toFixed(2)}
+                                ${parseFloat(monthlyTotalCollected.toString()).toFixed(2)}
                               </p>
                             </div>
                             <div>
-                              <p className="text-sm text-gray-500">Number of Receipts</p>
+                              <p className="text-sm text-gray-500">Number of Days with Collections</p>
                               <p className="text-2xl font-bold text-gray-900">
-                                {monthlyFeeData.length}
+                                {monthlyDailyCollections.length}
                               </p>
                             </div>
                             <div>
-                              <p className="text-sm text-gray-500">Average Receipt Amount</p>
+                              <p className="text-sm text-gray-500">Average Daily Collection</p>
                               <p className="text-2xl font-bold text-gray-900">
-                                ${(monthlyFeeData.reduce((sum: number, payment: any) => sum + parseFloat(payment.amount), 0) / monthlyFeeData.length).toFixed(2)}
+                                ${monthlyDailyCollections.length ? (monthlyTotalCollected / monthlyDailyCollections.length).toFixed(2) : "0.00"}
                               </p>
                             </div>
                           </div>
