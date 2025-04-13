@@ -240,8 +240,27 @@ export default function Reports() {
   };
 
   // Export data
-  const exportData = async (type: "students" | "expenses" | "inventory") => {
+  const exportData = async (type: "students" | "expenses" | "inventory" | "fees") => {
     try {
+      // For fees, use the direct API endpoint with window.location
+      if (type === "fees") {
+        if (activeTab === "fees") {
+          // For fees, check if we're on daily or pending tab
+          const selectedSubTab = document.querySelector('[data-state="active"][data-radix-collection-item]')?.getAttribute('value');
+          
+          if (selectedSubTab === "daily" && selectedDate) {
+            // Export daily fees
+            window.location.href = `/api/export/fees?date=${format(selectedDate, 'yyyy-MM-dd')}`;
+            return;
+          } else {
+            // Export all pending fees
+            window.location.href = `/api/export/fees`;
+            return;
+          }
+        }
+      }
+      
+      // For other data types
       const response = await fetch(`/api/export/${type}`);
       const data = await response.json();
       
