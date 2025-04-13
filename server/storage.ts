@@ -187,6 +187,9 @@ export interface IStorage {
   deleteBatch(id: number): Promise<boolean>;
   getStudentsByBatch(batchId: number): Promise<Student[]>;
   getStudentsByClassAndAcademicYear(classId: number, academicYearId: number): Promise<Student[]>;
+  
+  // Receipt number generation
+  getNextReceiptNumber(): Promise<string>;
 }
 
 export class MemStorage implements IStorage {
@@ -3008,4 +3011,61 @@ export class MemStorage implements IStorage {
   }
 }
 
+export class DatabaseStorage implements IStorage {
+  async getUser(id: number): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.id, id));
+    return user || undefined;
+  }
+
+  async getUserByUsername(username: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.username, username));
+    return user || undefined;
+  }
+
+  async createUser(insertUser: InsertUser): Promise<User> {
+    const [user] = await db
+      .insert(users)
+      .values(insertUser)
+      .returning();
+    return user;
+  }
+
+  // Other methods would be implemented here...
+
+  // Receipt number sequence management
+  async getNextReceiptNumber(): Promise<string> {
+    // Try to get the current sequence record
+    const [sequence] = await db.select().from(receiptNumberSequence).limit(1);
+    
+    if (sequence) {
+      // Update the sequence and return the current value
+      const nextValue = sequence.nextValue;
+      const prefix = sequence.prefix || 'RC-';
+      
+      // Update the sequence to the next value
+      await db.update(receiptNumberSequence)
+        .set({ 
+          nextValue: nextValue + 1,
+          lastUpdated: new Date()
+        })
+        .where(eq(receiptNumberSequence.id, sequence.id));
+      
+      // Format the receipt number with padded zeros
+      return `${prefix}${nextValue.toString().padStart(3, '0')}`;
+    } else {
+      // Create the sequence record if it doesn't exist
+      const [newSequence] = await db.insert(receiptNumberSequence)
+        .values({
+          nextValue: 1,
+          prefix: 'RC-'
+        })
+        .returning();
+      
+      // Return the initial value
+      return `${newSequence.prefix}001`;
+    }
+  }
+}
+
+// Use MemStorage for now, can be switched to DatabaseStorage later
 export const storage = new MemStorage();
