@@ -684,7 +684,7 @@ export default function Reports() {
                             {pendingFeeData.map((fee: any, index: number) => (
                               <tr key={index} className={index % 2 === 0 ? 'bg-gray-50' : ''}>
                                 <td className="py-3 px-4">{fee.studentName || 'Unassigned'}</td>
-                                <td className="py-3 px-4">{fee.feeStructureName}</td>
+                                <td className="py-3 px-4">{fee.feeName}</td>
                                 <td className="py-3 px-4">${parseFloat(fee.totalAmount).toFixed(2)}</td>
                                 <td className="py-3 px-4">${parseFloat(fee.paidAmount).toFixed(2)}</td>
                                 <td className="py-3 px-4">${parseFloat(fee.dueAmount).toFixed(2)}</td>
@@ -754,13 +754,13 @@ export default function Reports() {
                             </thead>
                             <tbody>
                               {dailyFeeData.map((payment: any, index: number) => (
-                                <tr key={payment.id} className={index % 2 === 0 ? 'bg-gray-50' : ''}>
-                                  <td className="py-3 px-4">{payment.id}</td>
+                                <tr key={payment.paymentId} className={index % 2 === 0 ? 'bg-gray-50' : ''}>
+                                  <td className="py-3 px-4">{payment.receiptNumber}</td>
                                   <td className="py-3 px-4">{payment.studentName}</td>
-                                  <td className="py-3 px-4">{payment.feeStructureName}</td>
+                                  <td className="py-3 px-4">{payment.feeName}</td>
                                   <td className="py-3 px-4">${parseFloat(payment.amount).toFixed(2)}</td>
                                   <td className="py-3 px-4">{payment.paymentMethod}</td>
-                                  <td className="py-3 px-4">{format(new Date(payment.paymentDate), 'h:mm a')}</td>
+                                  <td className="py-3 px-4">{format(new Date(payment.paymentDate), 'yyyy-MM-dd')}</td>
                                   <td className="py-3 px-4">{payment.notes || '-'}</td>
                                 </tr>
                               ))}
